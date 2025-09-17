@@ -1,0 +1,9 @@
+start_date: 2025-02-05  # first Wednesday in February (example block start)
+end_date: 2025-02-18
+bank_holidays: []
+# Mark Mondays for COMET 'on' weeks; here we enable COMET on the first week only
+comet_on_weeks:
+  - 2025-02-10
+max_day_clinicians: 5
+ideal_weekday_day_clinicians: 4
+min_weekday_day_clinicians: 3

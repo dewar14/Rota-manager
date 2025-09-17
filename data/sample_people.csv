@@ -1,0 +1,7 @@
+id,name,grade,wte,fixed_day_off,comet_eligible,start_date
+r1,Dr Reg One,Registrar,1.0,,True,
+r2,Dr Reg Two,Registrar,1.0,,False,
+s1,Dr SHO One,SHO,1.0,,False,
+s2,Dr SHO Two,SHO,0.8,2,False,
+u1,Dr Sup One,Supernumerary,1.0,,False,
+r3,Dr Reg Three,Registrar,0.6,4,True,

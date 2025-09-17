@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run API",
+      "type": "shell",
+      "command": "uvicorn app.main:app --reload",
+      "problemMatcher": []
+    },
+    {
+      "label": "Solve sample",
+      "type": "shell",
+      "command": "python scripts/solve_sample.py",
+      "problemMatcher": []
+    },
+    {
+      "label": "PyTest",
+      "type": "shell",
+      "command": "pytest -q",
+      "problemMatcher": []
+    }
+  ]
+}
