@@ -11,7 +11,7 @@ def _solve(problem: ProblemInput):
     x1, locums1, days, people = add_core_constraints(problem, model1, options={"nights_only": True})
     soft_objective(problem, model1, x1, locums1, days, people, options={"nights_only": True})
     solver1 = cp_model.CpSolver()
-    solver1.parameters.max_time_in_seconds = 60.0
+    solver1.parameters.max_time_in_seconds = 120.0  # Increased from 60
     solver1.parameters.num_search_workers = 8
     solver1_res = solver1.Solve(model1)
     freeze = []
@@ -26,9 +26,28 @@ def _solve(problem: ProblemInput):
     model = cp_model.CpModel()
     x, locums, days, people = add_core_constraints(problem, model, options={"freeze_nights": freeze})
     soft_objective(problem, model, x, locums, days, people)
+
+    # Add solution hints from Pass 1 nights to guide search (keeps CP-SAT near the nights layout)
+    try:
+        hinted_vars = []
+        hinted_vals = []
+        for (p_idx, d_idx, s) in freeze:
+            hinted_vars.append(x[p_idx, d_idx, s])
+            hinted_vals.append(1)
+            # Also hint the other night-type to 0 to reduce flips
+            other = "CMN" if s == "N" else "N"
+            if (p_idx, d_idx, other) in x:
+                hinted_vars.append(x[p_idx, d_idx, other])
+                hinted_vals.append(0)
+        if hinted_vars:
+            model.AddHint(hinted_vars, hinted_vals)
+    except Exception:
+        pass
+
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 120.0
+    solver.parameters.max_time_in_seconds = 120.0  # Reasonable timeout
     solver.parameters.num_search_workers = 8
+    solver.parameters.random_seed = 1
     res = solver.Solve(model)
     return res, solver, x, locums, days, people
 

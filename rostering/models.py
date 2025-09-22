@@ -34,21 +34,25 @@ class Config(BaseModel):
     global_unit_teaching_days: List[dt.date] = []
 
 class Weights(BaseModel):
-    locum: int = 1000
+    locum: int = 5000  # Significantly increased but not excessive
     single_night_penalty: int = 30
     fairness_variance: int = 20
     fairness_band_penalty: int = 15
     weekday_day_target_penalty: int = 4
     winter_extra_day_penalty: int = 2
-    weekend_split_penalty: int = 5
+    weekend_split_penalty: int = 25  # Moderate increase
     preassign_violation: int = 200
     fdo_violation: int = 50
     min_weekly_hours_penalty: int = 5
     max_weekly_hours_penalty: int = 4
-    weekend_continuity_bonus: int = 3
-    nights_pref_sd_before_bonus: int = 3
-    nights_crossover_bonus: int = 2
+    weekend_continuity_bonus: int = 5
+    nights_pref_sd_before_bonus: int = 5
+    nights_crossover_bonus: int = 3
     comet_ldn_share_factor: float = 0.8  # eligible registrars expected share multiplier for LD/N
+    # Simplified weights for sequence penalties
+    shift_switch_penalty: int = 8   # Moderate penalty for switching
+    consecutive_ld_bonus: int = 4   # Moderate bonus for consecutive LD days
+    night_block_bonus: int = 6      # Moderate bonus for proper night blocks
 
 class Preassignment(BaseModel):
     person_id: str
