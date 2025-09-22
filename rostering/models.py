@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Literal
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Literal, Any
 import datetime as dt
 
 Grade = Literal["SHO", "Registrar", "Supernumerary"]
@@ -12,6 +12,9 @@ class Person(BaseModel):
     fixed_day_off: Optional[int] = None  # 0=Mon .. 6=Sun
     comet_eligible: bool = False
     start_date: Optional[dt.date] = None  # date they join (inclusive)
+    # Entitlements (admin editable)
+    annual_leave_days: Optional[int] = None
+    cpd_entitlement: Optional[int] = None  # per 6 months
 
 class Shift(BaseModel):
     code: str             # e.g., SD, LD, N, CMD, CMN, CPD, TREG, TSHO, TPCCU, IND, OFF, LOCUM
@@ -25,25 +28,42 @@ class Config(BaseModel):
     end_date: dt.date
     bank_holidays: List[dt.date] = []
     comet_on_weeks: List[dt.date] = []  # Mondays marking weeks to run COMET (both day & night), alternate blocks
-    max_day_clinicians: int = 5
-    ideal_weekday_day_clinicians: int = 4
-    min_weekday_day_clinicians: int = 3
+    global_induction_days: List[dt.date] = []
+    global_registrar_teaching_days: List[dt.date] = []
+    global_sho_teaching_days: List[dt.date] = []
+    global_unit_teaching_days: List[dt.date] = []
 
 class Weights(BaseModel):
     locum: int = 1000
     single_night_penalty: int = 30
-    fairness_variance: int = 5
-    weekday_day_target_penalty: int = 1
+    fairness_variance: int = 20
+    fairness_band_penalty: int = 15
+    weekday_day_target_penalty: int = 4
     winter_extra_day_penalty: int = 2
+    weekend_split_penalty: int = 5
+    preassign_violation: int = 200
+    fdo_violation: int = 50
+    min_weekly_hours_penalty: int = 5
+    max_weekly_hours_penalty: int = 4
+    weekend_continuity_bonus: int = 3
+    nights_pref_sd_before_bonus: int = 3
+    nights_crossover_bonus: int = 2
+    comet_ldn_share_factor: float = 0.8  # eligible registrars expected share multiplier for LD/N
+
+class Preassignment(BaseModel):
+    person_id: str
+    date: dt.date
+    shift_code: str
 
 class ProblemInput(BaseModel):
     people: List[Person]
     config: Config
     weights: Weights = Weights()
+    preassignments: List[Preassignment] = []
 
 class SolveResult(BaseModel):
     success: bool
     message: str
     roster: Dict[str, Dict[str, str]]  # date -> person_id -> shift_code
     breaches: Dict[str, List[str]]
-    summary: Dict[str, float]
+    summary: Dict[str, Any]

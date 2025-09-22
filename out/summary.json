@@ -1,0 +1,305 @@
+{
+  "locum_slots": 359.0,
+  "per_person": {
+    "r1": {
+      "name": "Registrar 1",
+      "grade": "Registrar",
+      "wte": 1.0,
+      "avg_weekly_hours": 15.8,
+      "long_days": 19,
+      "nights": 0,
+      "ld_equiv": 19,
+      "n_equiv": 0,
+      "weekends": 2
+    },
+    "r2": {
+      "name": "Registrar 2",
+      "grade": "Registrar",
+      "wte": 1.0,
+      "avg_weekly_hours": 13.9,
+      "long_days": 18,
+      "nights": 0,
+      "ld_equiv": 18,
+      "n_equiv": 0,
+      "weekends": 1
+    },
+    "r3": {
+      "name": "Registrar 3",
+      "grade": "Registrar",
+      "wte": 1.0,
+      "avg_weekly_hours": 15.5,
+      "long_days": 19,
+      "nights": 0,
+      "ld_equiv": 19,
+      "n_equiv": 0,
+      "weekends": 4
+    },
+    "r4": {
+      "name": "Registrar 4",
+      "grade": "Registrar",
+      "wte": 1.0,
+      "avg_weekly_hours": 13.4,
+      "long_days": 19,
+      "nights": 0,
+      "ld_equiv": 19,
+      "n_equiv": 0,
+      "weekends": 1
+    },
+    "r5": {
+      "name": "Registrar 5",
+      "grade": "Registrar",
+      "wte": 0.8,
+      "avg_weekly_hours": 32.6,
+      "long_days": 15,
+      "nights": 0,
+      "ld_equiv": 15,
+      "n_equiv": 0,
+      "weekends": 5
+    },
+    "r6": {
+      "name": "Registrar 6",
+      "grade": "Registrar",
+      "wte": 0.8,
+      "avg_weekly_hours": 11.4,
+      "long_days": 15,
+      "nights": 0,
+      "ld_equiv": 15,
+      "n_equiv": 0,
+      "weekends": 2
+    },
+    "r7": {
+      "name": "Registrar 7",
+      "grade": "Registrar",
+      "wte": 0.8,
+      "avg_weekly_hours": 8.6,
+      "long_days": 15,
+      "nights": 0,
+      "ld_equiv": 15,
+      "n_equiv": 0,
+      "weekends": 0
+    },
+    "r8": {
+      "name": "Registrar 8",
+      "grade": "Registrar",
+      "wte": 0.8,
+      "avg_weekly_hours": 35.0,
+      "long_days": 19,
+      "nights": 0,
+      "ld_equiv": 19,
+      "n_equiv": 0,
+      "weekends": 6
+    },
+    "r9": {
+      "name": "Registrar 9",
+      "grade": "Registrar",
+      "wte": 0.6,
+      "avg_weekly_hours": 10.2,
+      "long_days": 14,
+      "nights": 0,
+      "ld_equiv": 14,
+      "n_equiv": 0,
+      "weekends": 1
+    },
+    "r10": {
+      "name": "Registrar 10",
+      "grade": "Registrar",
+      "wte": 0.6,
+      "avg_weekly_hours": 9.1,
+      "long_days": 14,
+      "nights": 0,
+      "ld_equiv": 14,
+      "n_equiv": 0,
+      "weekends": 3
+    },
+    "r11": {
+      "name": "Registrar 11",
+      "grade": "Registrar",
+      "wte": 0.6,
+      "avg_weekly_hours": 25.5,
+      "long_days": 14,
+      "nights": 0,
+      "ld_equiv": 14,
+      "n_equiv": 0,
+      "weekends": 3
+    },
+    "S1": {
+      "name": "SHO 1",
+      "grade": "SHO",
+      "wte": 1.0,
+      "avg_weekly_hours": 16.3,
+      "long_days": 28,
+      "nights": 1,
+      "ld_equiv": 28,
+      "n_equiv": 1,
+      "weekends": 1
+    },
+    "S2": {
+      "name": "SHO 2",
+      "grade": "SHO",
+      "wte": 1.0,
+      "avg_weekly_hours": 20.3,
+      "long_days": 28,
+      "nights": 0,
+      "ld_equiv": 28,
+      "n_equiv": 0,
+      "weekends": 4
+    },
+    "S3": {
+      "name": "SHO 3",
+      "grade": "SHO",
+      "wte": 1.0,
+      "avg_weekly_hours": 17.8,
+      "long_days": 28,
+      "nights": 2,
+      "ld_equiv": 28,
+      "n_equiv": 2,
+      "weekends": 1
+    },
+    "S4": {
+      "name": "SHO 4",
+      "grade": "SHO",
+      "wte": 1.0,
+      "avg_weekly_hours": 19.9,
+      "long_days": 28,
+      "nights": 2,
+      "ld_equiv": 28,
+      "n_equiv": 2,
+      "weekends": 5
+    },
+    "S5": {
+      "name": "SHO 5",
+      "grade": "SHO",
+      "wte": 1.0,
+      "avg_weekly_hours": 21.7,
+      "long_days": 28,
+      "nights": 0,
+      "ld_equiv": 28,
+      "n_equiv": 0,
+      "weekends": 8
+    },
+    "S6": {
+      "name": "SHO 6",
+      "grade": "SHO",
+      "wte": 0.8,
+      "avg_weekly_hours": 16.6,
+      "long_days": 22,
+      "nights": 0,
+      "ld_equiv": 22,
+      "n_equiv": 0,
+      "weekends": 8
+    },
+    "S7": {
+      "name": "SHO 7",
+      "grade": "SHO",
+      "wte": 0.6,
+      "avg_weekly_hours": 10.3,
+      "long_days": 17,
+      "nights": 0,
+      "ld_equiv": 17,
+      "n_equiv": 0,
+      "weekends": 3
+    },
+    "u1": {
+      "name": "Supernumerary 1",
+      "grade": "Supernumerary",
+      "wte": 1.0,
+      "avg_weekly_hours": 43.5,
+      "long_days": 0,
+      "nights": 0,
+      "ld_equiv": 0,
+      "n_equiv": 0,
+      "weekends": 0
+    },
+    "u2": {
+      "name": "Supernumerary 2",
+      "grade": "Supernumerary",
+      "wte": 1.0,
+      "avg_weekly_hours": 43.5,
+      "long_days": 0,
+      "nights": 0,
+      "ld_equiv": 0,
+      "n_equiv": 0,
+      "weekends": 0
+    },
+    "u3": {
+      "name": "Supernumerary 3",
+      "grade": "Supernumerary",
+      "wte": 1.0,
+      "avg_weekly_hours": 43.5,
+      "long_days": 0,
+      "nights": 0,
+      "ld_equiv": 0,
+      "n_equiv": 0,
+      "weekends": 0
+    },
+    "u4": {
+      "name": "Supernumerary 4",
+      "grade": "Supernumerary",
+      "wte": 1.0,
+      "avg_weekly_hours": 43.5,
+      "long_days": 0,
+      "nights": 0,
+      "ld_equiv": 0,
+      "n_equiv": 0,
+      "weekends": 0
+    },
+    "u5": {
+      "name": "Supernumerary 5",
+      "grade": "Supernumerary",
+      "wte": 1.0,
+      "avg_weekly_hours": 43.5,
+      "long_days": 0,
+      "nights": 0,
+      "ld_equiv": 0,
+      "n_equiv": 0,
+      "weekends": 0
+    },
+    "u6": {
+      "name": "Supernumerary 6",
+      "grade": "Supernumerary",
+      "wte": 0.8,
+      "avg_weekly_hours": 36.2,
+      "long_days": 0,
+      "nights": 0,
+      "ld_equiv": 0,
+      "n_equiv": 0,
+      "weekends": 0
+    }
+  },
+  "aggregates": {
+    "all": {
+      "count": 24,
+      "ld_equiv_total": 360,
+      "n_equiv_total": 5,
+      "ld_equiv_avg": 15.0,
+      "n_equiv_avg": 0.21
+    },
+    "registrar": {
+      "count": 11,
+      "ld_equiv_total": 181,
+      "n_equiv_total": 0,
+      "ld_equiv_avg": 16.45,
+      "n_equiv_avg": 0.0
+    },
+    "sho": {
+      "count": 7,
+      "ld_equiv_total": 179,
+      "n_equiv_total": 5,
+      "ld_equiv_avg": 25.57,
+      "n_equiv_avg": 0.71
+    }
+  },
+  "registrar_ld_equiv": {
+    "r1": 19,
+    "r2": 18,
+    "r3": 19,
+    "r4": 19,
+    "r5": 15,
+    "r6": 15,
+    "r7": 15,
+    "r8": 19,
+    "r9": 14,
+    "r10": 14,
+    "r11": 14
+  }
+}
