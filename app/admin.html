@@ -1,0 +1,1028 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roster Admin</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 24px; }
+    header { display:flex; align-items:center; gap: 12px; }
+    input, select, button { padding: 6px 8px; margin: 4px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; }
+    th { background: #f7f7f7; }
+  /* Shift color coding */
+  .code-SD { background:#fff3b0; }
+  .code-LD { background:#dff5e1; }
+  .code-N { background:#ffd6d6; }
+  .code-CMD { background:#ead9ff; }
+  .code-CMN { background:#ffe1c6; }
+  .code-CPD { background:#e0f0ff; }
+  .code-TREG, .code-TSHO, .code-TPCCU { background:#e3f2fd; }
+  .code-IND { background:#eeeeee; }
+  .code-OFF { color:#888; }
+  .code-LOCUM { background:#ffecec; font-weight:600; }
+  .bh { background:#f0f7ff; border-color:#bcd9ff; }
+    .row { display:flex; gap:8px; flex-wrap: wrap; }
+    #toast { position: fixed; right: 16px; bottom: 16px; background: #333; color:#fff; padding:10px 14px; border-radius:6px; opacity:0; transition: opacity .2s ease; pointer-events:none; }
+    #toast.show { opacity:1; }
+    .badge { display:inline-block; background:#eef3ff; color:#2643a6; border:1px solid #c9d6ff; padding:1px 6px; border-radius:10px; font-size: 12px; margin-left:6px; vertical-align: middle; }
+    .chips { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+    .chip { background:#f0f3f9; border:1px solid #cbd5e1; padding:2px 6px; border-radius:12px; font-size:12px; }
+    .chip button { margin-left:6px; border:none; background:transparent; cursor:pointer; font-size:12px; }
+    /* Simple modal */
+    .modal { position: fixed; inset: 0; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,0.3); }
+    .modal.show { display:flex; }
+    .modal-card { background:#fff; padding:16px; border-radius:8px; max-height:80vh; overflow:auto; min-width: 320px; }
+    .month { display:grid; grid-template-columns: repeat(7, 1fr); gap:4px; margin-bottom:8px; }
+    .day { padding:6px; border:1px solid #ddd; text-align:center; cursor:pointer; user-select:none; }
+    .day.sel { background:#e1f0ff; border-color:#84b7ff; }
+  </style>
+  <script>
+    function toast(msg){
+      const t = document.querySelector('#toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(()=> t.classList.remove('show'), 2000);
+    }
+  let PEOPLE_CACHE = [];
+  let PREASSIGN_CACHE = [];
+  let LAST_RESULT = null;
+  let STATS_SORT = { key: 'name', dir: 'asc' };
+  const EDITABLE_SHIFTS = ['OFF','LD','N','CMD','CMN','CPD','TREG','TSHO','TPCCU','IND',''];
+
+  // Global days helpers (induction/teaching)
+  function listDates(kind){
+    const list = document.querySelector(`#${kind}_list`);
+    return list ? Array.from(list.querySelectorAll('[data-date]')).map(el=>el.getAttribute('data-date')) : [];
+  }
+  function addGlobalDate(kind){
+    const input = document.querySelector(`#${kind}_date`);
+    if(!input || !input.value) return;
+    const iso = input.value;
+    const list = document.querySelector(`#${kind}_list`);
+    if(!list) return;
+    if(list.querySelector(`[data-date="${iso}"]`)) { toast('Date already added'); return; }
+    const span = document.createElement('span');
+    span.className = 'chip';
+    span.setAttribute('data-date', iso);
+    span.textContent = iso;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '×';
+    btn.title = 'Remove';
+    btn.onclick = () => { span.remove(); updateSummary(); };
+    span.appendChild(btn);
+    list.appendChild(span);
+    input.value = '';
+    updateSummary();
+  }
+
+  async function api(path, opts={}){
+      const headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+      const key = localStorage.getItem('apiKey');
+      if (key) headers['X-API-Key'] = key;
+      const res = await fetch(path, Object.assign({}, opts, {headers}));
+      if(!res.ok){
+        const txt = await res.text();
+        throw new Error(`HTTP ${res.status}: ${txt}`);
+      }
+      const ct = res.headers.get('content-type')||'';
+      return ct.includes('application/json') ? res.json() : res.text();
+    }
+    async function loadPeople(){
+      try{
+        const people = await api('/admin/people');
+        PEOPLE_CACHE = people;
+        const badge = document.querySelector('#people_count');
+        if(badge) badge.textContent = people.length;
+        const tbody = document.querySelector('#people tbody');
+        tbody.innerHTML = '';
+        for(const p of people){
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><a href="#" onclick="editPerson('${p.id}'); return false;">${p.id}</a></td>
+            <td><a href="#" onclick="editPerson('${p.id}'); return false;">${p.name}</a></td>
+            <td>${p.grade}</td>
+            <td>${p.wte}</td>
+            <td>${p.fixed_day_off ?? ''}</td>
+            <td>${p.comet_eligible ? 'Yes':'No'}</td>
+            <td>${p.start_date ?? ''}</td>
+            <td>
+              <button onclick="editPerson('${p.id}')">Edit</button>
+              <button onclick="delPerson('${p.id}')">Delete</button>
+            </td>`;
+          tbody.appendChild(tr);
+        }
+      }catch(e){ alert(e.message); }
+      updateSummary();
+    }
+    async function importSamplePeople(){
+      if(!confirm('Import sample_people.csv and overwrite matching IDs?')) return;
+      const r = await api('/admin/people/import-sample', {method:'POST'});
+      toast(`Imported sample people (total ${r.count})`);
+      await loadPeople();
+    }
+    async function clearPeople(){
+      if(!confirm('Clear ALL people?')) return;
+      try{
+        await api('/admin/people', {method:'DELETE'});
+        await loadPeople();
+        toast('People cleared');
+      } catch(e){
+        const msg = String(e.message||e);
+        if(msg.includes('HTTP 401')){
+          alert('Unauthorized (401). If ADMIN_API_KEY is set on the server, click "Set API Key" and enter it.');
+        } else {
+          alert('Failed to clear people: ' + msg);
+        }
+      }
+    }
+    function toPersonFromForm(){
+      return {
+        id: document.querySelector('#id').value.trim(),
+        name: document.querySelector('#name').value.trim(),
+        grade: document.querySelector('#grade').value,
+        wte: parseFloat(document.querySelector('#wte').value),
+        fixed_day_off: document.querySelector('#fdo').value ? parseInt(document.querySelector('#fdo').value) : null,
+        comet_eligible: document.querySelector('#comet').checked,
+        start_date: document.querySelector('#start').value || null,
+        annual_leave_days: document.querySelector('#al_days').value ? parseInt(document.querySelector('#al_days').value) : null,
+        cpd_entitlement: document.querySelector('#cpd_ent').value ? parseInt(document.querySelector('#cpd_ent').value) : null
+      };
+    }
+    function setForm(p){
+      document.querySelector('#id').value = p?.id || '';
+      document.querySelector('#name').value = p?.name || '';
+      document.querySelector('#grade').value = p?.grade || 'SHO';
+      document.querySelector('#wte').value = p?.wte ?? 1.0;
+      document.querySelector('#fdo').value = p?.fixed_day_off ?? '';
+      document.querySelector('#comet').checked = !!p?.comet_eligible;
+      document.querySelector('#start').value = p?.start_date || '';
+      document.querySelector('#al_days').value = p?.annual_leave_days ?? '';
+      document.querySelector('#cpd_ent').value = p?.cpd_entitlement ?? '';
+    }
+    async function savePerson(){
+      const p = toPersonFromForm();
+      if(!p.id){ alert('ID is required'); return; }
+      if(Number.isNaN(p.wte) || p.wte <= 0){ alert('WTE must be a number > 0'); return; }
+      try{
+        try{
+          await api('/admin/people', {method:'POST', body: JSON.stringify(p)});
+        }catch(e){
+          if(String(e).includes('409')){
+            await api(`/admin/people/${encodeURIComponent(p.id)}`, {method:'PUT', body: JSON.stringify(p)});
+          } else {
+            throw e;
+          }
+        }
+        await loadPeople();
+        setForm(null);
+        toast(`Saved '${p.id}'`);
+      } catch(e){
+        const msg = String(e.message||e);
+        if(msg.includes('HTTP 401')){
+          alert('Unauthorized (401). If ADMIN_API_KEY is set on the server, click "Set API Key" and enter it.');
+        } else if(msg.includes('HTTP 422')){
+          alert('Validation failed (422). Please check all fields (IDs unique, numbers valid).');
+        } else {
+          alert('Failed to save person: ' + msg);
+        }
+        console.error('savePerson error', e);
+      }
+    }
+
+    async function savePersonNext(){
+      const p = toPersonFromForm();
+      if(!p.id){ alert('ID is required'); return; }
+      if(Number.isNaN(p.wte) || p.wte <= 0){ alert('WTE must be a number > 0'); return; }
+      const idx = PEOPLE_CACHE.findIndex(x => x.id === p.id);
+      let nextId = null;
+      if(idx >= 0 && idx + 1 < PEOPLE_CACHE.length){ nextId = PEOPLE_CACHE[idx + 1].id; }
+      try{
+        try{
+          await api('/admin/people', {method:'POST', body: JSON.stringify(p)});
+        }catch(e){
+          if(String(e).includes('409')){
+            await api(`/admin/people/${encodeURIComponent(p.id)}`, {method:'PUT', body: JSON.stringify(p)});
+          } else { throw e; }
+        }
+        await loadPeople();
+        if(nextId){
+          await editPerson(nextId);
+          toast(`Saved '${p.id}'. Next: '${nextId}'.`);
+        } else {
+          await editPerson(p.id);
+          toast(`Saved '${p.id}' (last person).`);
+        }
+      } catch(e){
+        const msg = String(e.message||e);
+        if(msg.includes('HTTP 401')){
+          alert('Unauthorized (401). If ADMIN_API_KEY is set on the server, click "Set API Key" and enter it.');
+        } else if(msg.includes('HTTP 422')){
+          alert('Validation failed (422). Please check all fields (IDs unique, numbers valid).');
+        } else {
+          alert('Failed to save person: ' + msg);
+        }
+        console.error('savePersonNext error', e);
+      }
+    }
+    async function editPerson(id){
+      const p = await api(`/admin/people/${encodeURIComponent(id)}`);
+      setForm(p);
+      const idInput = document.querySelector('#id');
+      if(idInput){
+        idInput.scrollIntoView({behavior:'smooth', block:'center'});
+        idInput.focus();
+      }
+    }
+    async function delPerson(id){
+      if(!confirm('Delete '+id+'?')) return;
+      try{
+        await api(`/admin/people/${encodeURIComponent(id)}`, {method:'DELETE'});
+        await loadPeople();
+        toast('Deleted ' + id);
+      } catch(e){
+        const msg = String(e.message||e);
+        if(msg.includes('HTTP 401')){
+          alert('Unauthorized (401). If ADMIN_API_KEY is set on the server, click "Set API Key" and enter it.');
+        } else {
+          alert('Failed to delete ' + id + ': ' + msg);
+        }
+      }
+    }
+    function setKey(){
+      const v = prompt('Enter API Key (leave empty to clear):', localStorage.getItem('apiKey')||'');
+      if(v===null) return; // cancel
+      if(v) localStorage.setItem('apiKey', v); else localStorage.removeItem('apiKey');
+      loadPeople();
+    }
+    window.addEventListener('DOMContentLoaded', loadPeople);
+
+    function renderRoster(result){
+      const table = document.querySelector('#roster');
+      const thead = table.querySelector('thead');
+      const tbody = table.querySelector('tbody');
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+
+      if(!result || !result.roster){ return; }
+      const dates = Object.keys(result.roster).sort();
+  const people = PEOPLE_CACHE.length ? PEOPLE_CACHE : [];
+  const baseCols = people.map(p => ({id:p.id, label:`${p.name} (${p.id})`}));
+  // Detect explicit locum columns by key prefix LOC_
+  const sample = result.roster[dates[0]] || {};
+  const locumCols = Object.keys(sample).filter(k => k.startsWith('LOC_')).map(id => ({id, label:id}));
+  const cols = [...baseCols, ...locumCols];
+
+  const trh = document.createElement('tr');
+  trh.innerHTML = `<th>Date</th><th>DOW</th><th>Cover</th>` + cols.map(c => `<th><a href=\"#\" onclick=\"editPerson('${c.id}'); return false;\">${c.label}</a></th>`).join('');
+      thead.appendChild(trh);
+
+      for(const d of dates){
+        const row = document.createElement('tr');
+        const dateObj = new Date(d + 'T00:00:00');
+        const dowNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+        const dow = dowNames[dateObj.getDay()];
+        const bhSet = new Set(((document.querySelector('#cfg_bh')||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean));
+        const isBH = bhSet.has(d);
+        // Coverage counters
+        const r = result.roster[d] || {};
+        const count = (pred)=> Object.keys(r).filter(k=>!k.startsWith('LOC_') && pred(r[k], k)).length;
+        const countLocum = (key)=> (r[key] === 'LOCUM') ? 1 : 0;
+        const shoLD = count((v,k)=> v==='LD' && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='SHO')) + countLocum('LOC_SHO_LD');
+        const regLD = count((v,k)=> v==='LD' && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='Registrar')) + countLocum('LOC_REG_LD');
+        const shoN  = count((v,k)=> v==='N'  && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='SHO')) + countLocum('LOC_SHO_N');
+        const regN  = count((v,k)=> v==='N'  && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='Registrar')) + countLocum('LOC_REG_N');
+        const cmd   = count((v,k)=> v==='CMD') + countLocum('LOC_REG_CMD');
+        const cmn   = count((v,k)=> v==='CMN') + countLocum('LOC_REG_CMN');
+        const sdNS  = count((v,k)=> v==='SD' && PEOPLE_CACHE.find(p=>p.id===k && p.grade!=='Supernumerary')); // exclude supernumerary
+        const coverCell = `${sdNS} SD, SHO LD ${shoLD}, Reg LD ${regLD}, SHO N ${shoN}, Reg N ${regN}${(cmd||cmn)?`, COMET D ${cmd}, N ${cmn}`:''}`;
+        let html = `<td class="${isBH?'bh':''}">${d}${isBH?' •BH':''}</td><td>${dow}</td><td>${coverCell}</td>`;
+        for(const c of cols){
+          const code = (result.roster[d] && result.roster[d][c.id]) || '';
+          const cls = `cell code-${code||'OFF'}`;
+          html += `<td class="${cls}" data-date="${d}" data-person="${c.id}" title="Click to edit">${code}</td>`;
+        }
+        row.innerHTML = html;
+        tbody.appendChild(row);
+      }
+
+      // Click-to-edit handler
+      tbody.addEventListener('click', async (e)=>{
+        const td = e.target.closest('td.cell');
+        if(!td) return;
+        const date = td.getAttribute('data-date');
+        const pid = td.getAttribute('data-person');
+        const current = (td.textContent||'').trim();
+        const choice = prompt(`Set shift for ${pid} on ${date}\n(Options: ${EDITABLE_SHIFTS.join(', ')})`, current);
+        if(choice === null) return; // cancelled
+        const v = choice.trim().toUpperCase();
+        if(v === '' || v === 'CLEAR'){
+          // delete preassignment if exists
+          await api(`/admin/preassignments/${encodeURIComponent(pid)}/${encodeURIComponent(date)}`, {method:'DELETE'});
+          td.textContent = '';
+          toast(`Cleared preassignment for ${pid} on ${date}`);
+          loadPreassignments();
+          return;
+        }
+        if(!EDITABLE_SHIFTS.includes(v)){
+          alert('Invalid code. Allowed: ' + EDITABLE_SHIFTS.join(', '));
+          return;
+        }
+        // Save preassignment
+        await api('/admin/preassignments', {method:'POST', body: JSON.stringify({date, person_id: pid, shift_code: v})});
+        td.textContent = v;
+        toast(`Set ${v} for ${pid} on ${date}`);
+        loadPreassignments();
+      });
+    }
+
+    function renderStats(result){
+      const table = document.querySelector('#stats');
+      if(!table){ return; }
+      const tbody = table.querySelector('tbody');
+      const aggRow = table.querySelector('#stats_agg');
+      tbody.innerHTML = '';
+      const per = (result && result.summary && result.summary.per_person) || {};
+      // Prepare rows array
+      const rows = Object.keys(per).map(id => ({ id, ...per[id] }));
+      // Sort by current sort
+      const { key, dir } = STATS_SORT || { key: 'name', dir: 'asc' };
+      rows.sort((a,b)=>{
+        const va = a[key];
+        const vb = b[key];
+        let cmp = 0;
+        if(typeof va === 'number' && typeof vb === 'number'){
+          cmp = va - vb;
+        } else {
+          cmp = String(va ?? '').localeCompare(String(vb ?? ''), undefined, {numeric:true, sensitivity:'base'});
+        }
+        return dir === 'asc' ? cmp : -cmp;
+      });
+      for(const row of rows){
+        const id = row.id;
+        const s = row;
+        const tr = document.createElement('tr');
+  tr.innerHTML = `<td><a href=\"#\" onclick=\"editPerson('${id}'); return false;\">${s.name || ''} (${id})</a></td>`+
+                       `<td>${s.grade || ''}</td>`+
+                       `<td>${s.wte ?? ''}</td>`+
+                       `<td>${s.avg_weekly_hours ?? ''}</td>`+
+                       `<td>${s.long_days ?? ''}</td>`+
+                       `<td>${s.nights ?? ''}</td>`+
+                       `<td>${s.ld_equiv ?? ''}</td>`+
+                       `<td>${s.n_equiv ?? ''}</td>`+
+                       `<td>${s.weekends ?? ''}</td>`;
+        tbody.appendChild(tr);
+      }
+      // Footer aggregates
+      const agg = (result && result.summary && result.summary.aggregates) || {};
+      const all = agg.all || {}; const reg = agg.registrar || {}; const sho = agg.sho || {};
+      const fmt = (a)=>`count ${a.count||0} | LD-eq total ${a.ld_equiv_total||0}, avg ${a.ld_equiv_avg||0} | N-eq total ${a.n_equiv_total||0}, avg ${a.n_equiv_avg||0}`;
+      const el = document.querySelector('#stats_agg');
+      if(el){ el.innerHTML = `<strong>All:</strong> ${fmt(all)} &nbsp; <strong>Registrars:</strong> ${fmt(reg)} &nbsp; <strong>SHOs:</strong> ${fmt(sho)}`; }
+    }
+
+    function renderDebug(result){
+      const cont = document.querySelector('#debug_panel');
+      if(!cont) return;
+      cont.innerHTML = '';
+      const dbg = result && result.summary && result.summary.debug;
+      if(!dbg || Object.keys(dbg).length === 0){
+        cont.textContent = 'No diagnostics available. Diagnostics appear when any locum is used or fallback occurs.';
+        return;
+      }
+      const days = Object.keys(dbg).sort();
+      const frag = document.createDocumentFragment();
+  const note = document.createElement('div');
+      note.style.margin = '6px 0';
+  note.textContent = 'Per-day eligibility and exclusion reasons for categories with locums or interest:';
+      frag.appendChild(note);
+      days.forEach((d, idx)=>{
+        const details = document.createElement('details');
+        if(idx < 3) details.open = true;
+        const sum = document.createElement('summary');
+        sum.textContent = d;
+        details.appendChild(sum);
+        const day = dbg[d] || {};
+        const keys = Object.keys(day);
+        const table = document.createElement('table');
+        table.style.margin = '6px 0';
+        table.innerHTML = '<thead><tr><th>Category</th><th>Eligible</th><th>Summary</th><th>Excluded: start_date</th><th>Excluded: preassigned</th><th>Excluded: fixed_day_off</th><th>Excluded: comet_ineligible</th><th>Note</th></tr></thead>';
+        const tb = document.createElement('tbody');
+        keys.forEach(k=>{
+          const info = day[k] || {};
+          const tr = document.createElement('tr');
+          const el = Array.isArray(info.eligible_after_filters) ? info.eligible_after_filters.join(' ') : '';
+          const ex = info.excluded || {};
+          const exs = (arr)=> Array.isArray(arr) ? arr.join(' ') : '';
+          const sum = info.summary_text || '';
+          tr.innerHTML = `<td>${k}</td><td>${el}</td><td>${sum}</td><td>${exs(ex.start_date)}</td><td>${exs(ex.preassigned)}</td><td>${exs(ex.fixed_day_off)}</td><td>${exs(ex.comet_ineligible)}</td><td>${ex.sd_disabled_today ? 'SD disabled' : ''}</td>`;
+          tb.appendChild(tr);
+        });
+        table.appendChild(tb);
+        details.appendChild(table);
+        frag.appendChild(details);
+      });
+      cont.appendChild(frag);
+    }
+
+    function initStatsSorting(){
+      const thead = document.querySelector('#stats thead');
+      if(!thead) return;
+      thead.addEventListener('click', (e)=>{
+        const th = e.target.closest('th');
+        if(!th) return;
+        const key = th.getAttribute('data-key');
+        if(!key) return;
+        if(STATS_SORT.key === key){
+          STATS_SORT.dir = STATS_SORT.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          STATS_SORT.key = key;
+          // Default numeric columns to desc, text to asc
+          STATS_SORT.dir = ['wte','avg_weekly_hours','long_days','nights','weekends','ld_equiv','n_equiv'].includes(key) ? 'desc' : 'asc';
+        }
+        // Simple visual indicator
+        for(const h of thead.querySelectorAll('th')){ h.textContent = h.textContent.replace(/\s*[▲▼]$/,''); }
+        th.textContent = th.textContent.replace(/\s*[▲▼]$/,'') + (STATS_SORT.dir === 'asc' ? ' ▲' : ' ▼');
+        if(LAST_RESULT){ renderStats(LAST_RESULT); }
+      });
+    }
+
+    function exportCsv(){
+      const res = LAST_RESULT;
+      if(!res || !res.roster){ alert('No solve result to export.'); return; }
+      const dates = Object.keys(res.roster).sort();
+  const people = PEOPLE_CACHE.length ? PEOPLE_CACHE : [];
+  const sample = dates.length ? res.roster[dates[0]] : {};
+  const locumCols = Object.keys(sample||{}).filter(k => k.startsWith('LOC_'));
+  const header = ['date', ...people.map(p => `${p.id}`), ...locumCols];
+      const rows = [header.join(',')];
+      for(const d of dates){
+        const cells = [d];
+        for(const p of people){
+          let v = (res.roster[d] && res.roster[d][p.id]) || '';
+          if(typeof v === 'string' && v.includes(',')){
+            v = '"'+v.replace(/"/g,'""')+'"';
+          }
+          cells.push(v);
+        }
+        // Append locum columns in the same order
+        for(const k of locumCols){
+          let v = (res.roster[d] && res.roster[d][k]) || '';
+          if(typeof v === 'string' && v.includes(',')){
+            v = '"'+v.replace(/"/g,'""')+'"';
+          }
+          cells.push(v);
+        }
+        rows.push(cells.join(','));
+      }
+      const blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'roster.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function exportStatsCsv(){
+      const res = LAST_RESULT;
+      const per = res && res.summary && res.summary.per_person;
+      if(!per){ alert('No stats to export. Run Solve first.'); return; }
+      const rowsData = Object.keys(per).map(id => ({ id, ...per[id] }));
+      const { key, dir } = STATS_SORT || { key: 'name', dir: 'asc' };
+      rowsData.sort((a,b)=>{
+        const va = a[key];
+        const vb = b[key];
+        let cmp = 0;
+        if(typeof va === 'number' && typeof vb === 'number'){
+          cmp = va - vb;
+        } else {
+          cmp = String(va ?? '').localeCompare(String(vb ?? ''), undefined, {numeric:true, sensitivity:'base'});
+        }
+        return dir === 'asc' ? cmp : -cmp;
+      });
+      const header = ['id','name','grade','wte','avg_weekly_hours','long_days','nights','ld_equiv','n_equiv','weekends'];
+      const lines = [header.join(',')];
+      for(const r of rowsData){
+        const vals = [r.id, r.name || '', r.grade || '', r.wte ?? '', r.avg_weekly_hours ?? '', r.long_days ?? '', r.nights ?? '', r.ld_equiv ?? '', r.n_equiv ?? '', r.weekends ?? ''];
+        const cells = vals.map(v => {
+          let s = String(v);
+          if(s.includes(',')) s = '"'+s.replace(/"/g,'""')+'"';
+          return s;
+        });
+        lines.push(cells.join(','));
+      }
+      const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'roster_stats.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function runSolve(){
+      const config = {
+        start_date: document.querySelector('#cfg_start').value,
+        end_date: document.querySelector('#cfg_end').value,
+        bank_holidays: (document.querySelector('#cfg_bh').value||'').split(',').map(s=>s.trim()).filter(Boolean),
+        comet_on_weeks: (document.querySelector('#cfg_comet').value||'').split(',').map(s=>s.trim()).filter(Boolean),
+        global_induction_days: listDates('ind'),
+        global_registrar_teaching_days: listDates('treg'),
+        global_sho_teaching_days: listDates('tsho'),
+        global_unit_teaching_days: listDates('tunit')
+      };
+      const solveOut = document.querySelector('#solve_out');
+      const badge = document.querySelector('#relaxed_badge');
+      if(badge){ badge.style.display = 'none'; }
+      try{
+        // Fire async job
+        const { job_id } = await api('/admin/solve-async', { method:'POST', body: JSON.stringify({config})});
+        const logEl = document.querySelector('#progress_log');
+        if(logEl){ logEl.textContent = 'Solving...'; }
+        // Poll status
+        const poll = async () => {
+          const st = await api(`/admin/solve-status/${encodeURIComponent(job_id)}`);
+          const lines = Array.isArray(st.log) ? st.log : [];
+          if(logEl){ logEl.textContent = lines.join('\n'); logEl.scrollTop = logEl.scrollHeight; }
+          if(st.state === 'running'){
+            setTimeout(poll, 800);
+            return;
+          }
+          if(st.state === 'failed'){
+            const details = { error: st.error || 'Solve failed', traceback: st.traceback || '' };
+            solveOut.textContent = JSON.stringify(details, null, 2);
+            toast(details.error);
+            return;
+          }
+          // completed
+          const res = st.result;
+          LAST_RESULT = res;
+          const out = { summary: res.summary || {}, breaches: res.breaches || {} };
+          solveOut.textContent = JSON.stringify(out, null, 2);
+          renderRoster(res);
+          renderStats(res);
+          renderDebug(res);
+        };
+        setTimeout(poll, 500);
+      } catch(e){
+        if(badge){ badge.style.display = 'none'; }
+        solveOut.textContent = String(e.message||e);
+        alert('Solve failed: ' + (e.message||e));
+      }
+    }
+
+    async function seedBankHolidays(){
+      try{
+        const start = document.querySelector('#cfg_start').value;
+        const end = document.querySelector('#cfg_end').value;
+        if(!start || !end){ alert('Set start and end dates first.'); return; }
+        const resp = await fetch('https://www.gov.uk/bank-holidays.json');
+        const data = await resp.json();
+        const events = (data['england-and-wales'] && data['england-and-wales'].events) || [];
+        const inRange = events.map(e => e.date).filter(d => d >= start && d <= end);
+        document.querySelector('#cfg_bh').value = inRange.join(',');
+        updateSummary();
+      }catch(e){
+        alert('Could not fetch GOV.UK bank holidays. Paste dates manually.');
+      }
+    }
+
+    async function addLeaveRange(){
+      const pid = document.querySelector('#leave_person').value.trim();
+      const s = document.querySelector('#leave_start').value;
+      const e = document.querySelector('#leave_end').value;
+      if(!pid || !s || !e){ alert('Enter person, start and end dates.'); return; }
+      const start = new Date(s);
+      const end = new Date(e);
+      if(end < start){ alert('End date must be after start date.'); return; }
+      for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+        const iso = d.toISOString().slice(0,10);
+        await api('/admin/preassignments', {method:'POST', body: JSON.stringify({date: iso, person_id: pid, shift_code: 'OFF'})});
+      }
+      document.querySelector('#leave_person').value = '';
+      document.querySelector('#leave_start').value = '';
+      document.querySelector('#leave_end').value = '';
+      loadPreassignments();
+    }
+
+    async function loadPreassignments(){
+      const items = await api('/admin/preassignments');
+      PREASSIGN_CACHE = items;
+      const tbody = document.querySelector('#preassign tbody');
+      tbody.innerHTML = '';
+      for(const it of items){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${it.date}</td><td>${it.person_id}</td><td>${it.shift_code}</td>`;
+        tbody.appendChild(tr);
+      }
+      const badge = document.querySelector('#preassign_count');
+      if(badge) badge.textContent = items.length;
+      updateSummary();
+    }
+    async function addPreassignment(){
+      const date = document.querySelector('#pre_date').value;
+      const pid = document.querySelector('#pre_person').value.trim();
+      const shift = document.querySelector('#pre_shift').value;
+      if(!date || !pid || !shift){ alert('All fields required'); return; }
+      await api('/admin/preassignments', {method:'POST', body: JSON.stringify({date, person_id: pid, shift_code: shift})});
+      document.querySelector('#pre_person').value = '';
+      loadPreassignments();
+    }
+    async function clearPreassignments(){
+      if(!confirm('Clear all preassignments?')) return;
+      try{
+        await api('/admin/preassignments', {method:'DELETE'});
+        loadPreassignments();
+        toast('Preassignments cleared');
+      } catch(e){
+        const msg = String(e.message||e);
+        if(msg.includes('HTTP 401')){
+          alert('Unauthorized (401). If ADMIN_API_KEY is set on the server, click "Set API Key" and enter it.');
+        } else {
+          alert('Failed to clear preassignments: ' + msg);
+        }
+      }
+    }
+
+    function defaultHorizon(){
+      // First Wednesday of Feb 2026
+      const d = new Date('2026-02-01');
+      while(d.getDay() !== 3) d.setDate(d.getDate()+1); // 3=Wed
+      const start = d.toISOString().slice(0,10);
+      const end = new Date(d); end.setDate(end.getDate()+26*7-1);
+      const endStr = end.toISOString().slice(0,10);
+      document.querySelector('#cfg_start').value = start;
+      document.querySelector('#cfg_end').value = endStr;
+    }
+    function countList(input){
+      return (input || '').split(',').map(s=>s.trim()).filter(Boolean).length;
+    }
+    function daysDiff(start, end){
+      if(!start || !end) return 0;
+      const s = new Date(start + 'T00:00:00');
+      const e = new Date(end + 'T00:00:00');
+      if(e < s) return 0;
+      const ms = e - s;
+      return Math.floor(ms/86400000) + 1; // inclusive
+    }
+    function updateSummary(){
+      const ppl = PEOPLE_CACHE.length || 0;
+      const pre = PREASSIGN_CACHE.length || 0;
+      const start = (document.querySelector('#cfg_start')||{}).value || '';
+      const end = (document.querySelector('#cfg_end')||{}).value || '';
+      const bhStr = (document.querySelector('#cfg_bh')||{}).value || '';
+  const cometStr = (document.querySelector('#cfg_comet')||{}).value || '';
+      const days = daysDiff(start, end);
+      const bh = countList(bhStr);
+  const cw = countList(cometStr);
+  const ind = listDates('ind').length;
+  const treg = listDates('treg').length;
+  const tsho = listDates('tsho').length;
+  const tunit = listDates('tunit').length;
+      const el = document.querySelector('#solve_summary');
+      if(el){
+        el.querySelector('[data-k="people"]').textContent = ppl;
+        el.querySelector('[data-k="preassign"]').textContent = pre;
+        el.querySelector('[data-k="days"]').textContent = days;
+        el.querySelector('[data-k="bh"]').textContent = bh;
+  el.querySelector('[data-k="comet"]').textContent = cw;
+  const setText = (k,v)=>{ const n = el.querySelector(`[data-k="${k}"]`); if(n) n.textContent = v; };
+  setText('ind', ind);
+  setText('treg', treg);
+  setText('tsho', tsho);
+  setText('tunit', tunit);
+      }
+    }
+    window.addEventListener('DOMContentLoaded', ()=>{
+      defaultHorizon();
+      loadPeople();
+      loadPreassignments();
+      updateSummary();
+      initStatsSorting();
+      for(const id of ['#cfg_start','#cfg_end','#cfg_bh','#cfg_comet']){
+        const el = document.querySelector(id);
+        if(el){ el.addEventListener('input', updateSummary); }
+      }
+      setupCalendarModal();
+    });
+
+    // --- Multi-select Calendar Modal ---
+    let CAL_KIND = null;
+    function setupCalendarModal(){
+      const modal = document.querySelector('#cal_modal');
+      const close = ()=>{ modal.classList.remove('show'); };
+      document.querySelector('#cal_close').onclick = close;
+      document.querySelector('#cal_cancel').onclick = close;
+      document.querySelector('#cal_apply').onclick = ()=>{
+        const days = Array.from(modal.querySelectorAll('.day.sel')).map(d=>d.getAttribute('data-date'));
+        for(const iso of days){
+          const list = document.querySelector(`#${CAL_KIND}_list`);
+          if(!list) continue;
+          if(list.querySelector(`[data-date="${iso}"]`)) continue;
+          const span = document.createElement('span');
+          span.className = 'chip';
+          span.setAttribute('data-date', iso);
+          span.textContent = iso;
+          const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = '×'; btn.title = 'Remove';
+          btn.onclick = ()=>{ span.remove(); updateSummary(); };
+          span.appendChild(btn);
+          list.appendChild(span);
+        }
+        updateSummary();
+        close();
+      };
+      document.querySelectorAll('[data-cal-launch]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          CAL_KIND = btn.getAttribute('data-cal-launch');
+          buildCalendar(modal);
+          modal.classList.add('show');
+        });
+      });
+    }
+    function buildCalendar(modal){
+      const cont = modal.querySelector('#cal_body');
+      cont.innerHTML = '';
+      const start = document.querySelector('#cfg_start').value || new Date().toISOString().slice(0,10);
+      const end = document.querySelector('#cfg_end').value || start;
+      const s = new Date(start + 'T00:00:00');
+      const e = new Date(end + 'T00:00:00');
+      const months = [];
+      const cur = new Date(s);
+      cur.setDate(1);
+      while(cur <= e){ months.push(new Date(cur)); cur.setMonth(cur.getMonth()+1); }
+      for(const m of months){
+        const title = document.createElement('div');
+        title.innerHTML = `<strong>${m.toLocaleString(undefined,{month:'long',year:'numeric'})}</strong>`;
+        cont.appendChild(title);
+        const grid = document.createElement('div'); grid.className = 'month';
+        const firstDay = new Date(m);
+        const startDow = (firstDay.getDay()+6)%7; // Mon=0
+        for(let i=0;i<startDow;i++){ const pad=document.createElement('div'); grid.appendChild(pad); }
+        const last = new Date(m); last.setMonth(m.getMonth()+1); last.setDate(0); const lastDate = last.getDate();
+        for(let d=1; d<=lastDate; d++){
+          const iso = new Date(m.getFullYear(), m.getMonth(), d).toISOString().slice(0,10);
+          if(iso < start || iso > end) { const pad=document.createElement('div'); grid.appendChild(pad); continue; }
+          const cell = document.createElement('div'); cell.className = 'day'; cell.textContent = String(d);
+          cell.setAttribute('data-date', iso);
+          cell.onclick = () => { cell.classList.toggle('sel'); };
+          grid.appendChild(cell);
+        }
+        cont.appendChild(grid);
+      }
+    }
+
+    // --- COMET alternate-week seeding ---
+    function seedCometFromFirstMonday(){
+      const start = document.querySelector('#cfg_start').value;
+      const end = document.querySelector('#cfg_end').value;
+      const firstMon = document.querySelector('#comet_first_monday').value;
+      if(!start || !end || !firstMon){ alert('Set horizon start/end and first Monday.'); return; }
+      const s = new Date(firstMon + 'T00:00:00');
+      if(s.getDay() !== 1){ alert('Selected date is not a Monday.'); return; }
+      const E = new Date(end + 'T00:00:00');
+      const dates = [];
+      for(let d=new Date(s); d<=E; d.setDate(d.getDate()+14)){
+        const iso = d.toISOString().slice(0,10);
+        dates.push(iso);
+      }
+      document.querySelector('#cfg_comet').value = dates.join(',');
+      updateSummary();
+    }
+
+    // --- Prefill from snapshot ---
+    function addChip(kind, iso){
+      const list = document.querySelector(`#${kind}_list`);
+      if(!list || !iso) return;
+      if(list.querySelector(`[data-date="${iso}"]`)) return;
+      const span = document.createElement('span');
+      span.className = 'chip';
+      span.setAttribute('data-date', iso);
+      span.textContent = iso;
+      const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = '×'; btn.title = 'Remove';
+      btn.onclick = ()=>{ span.remove(); updateSummary(); };
+      span.appendChild(btn);
+      list.appendChild(span);
+    }
+    function prefillDatasetDates(){
+      // Horizon: first Wed of Feb 2026 for 26 weeks
+      const d = new Date('2026-02-01'); while(d.getDay()!==3) d.setDate(d.getDate()+1);
+      const start = d.toISOString().slice(0,10);
+      const endD = new Date(d); endD.setDate(endD.getDate()+26*7-1);
+      const end = endD.toISOString().slice(0,10);
+      document.querySelector('#cfg_start').value = start;
+      document.querySelector('#cfg_end').value = end;
+
+      // Seed bank holidays
+      seedBankHolidays();
+
+      // COMET: Use first Monday 2026-02-16 (example) and alternate
+      document.querySelector('#comet_first_monday').value = '2026-02-16';
+      seedCometFromFirstMonday();
+
+      // Registrar training dates per sheet
+      ['2026-02-17','2026-03-18','2026-04-22','2026-05-20','2026-06-24','2026-07-22'].forEach(d=>addChip('treg', d));
+      // SHO training dates per sheet
+      ['2026-02-25','2026-03-25','2026-04-28','2026-05-27','2026-06-30','2026-07-28'].forEach(d=>addChip('tsho', d));
+      // Unit teaching dates per sheet
+      ['2026-02-12','2026-02-26','2026-03-11','2026-05-08','2026-07-09'].forEach(d=>addChip('tunit', d));
+      updateSummary();
+      toast('Prefilled dates from dataset');
+    }
+  </script>
+</head>
+<body>
+  <header>
+    <h2>Roster Admin</h2>
+    <button onclick="setKey()">Set API Key</button>
+    <a href="/docs" target="_blank">API Docs</a>
+  </header>
+
+  <section>
+    <h3>People <span id="people_count" class="badge">0</span></h3>
+    <div class="row">
+      <input id="id" placeholder="ID (unique)">
+      <input id="name" placeholder="Name">
+      <select id="grade">
+        <option>SHO</option>
+        <option>Registrar</option>
+        <option>Supernumerary</option>
+      </select>
+      <input id="wte" type="number" min="0" max="1" step="0.1" value="1.0" placeholder="WTE">
+      <label title="For LTFT only: prevents assignments on this weekday (0=Mon..6=Sun)">
+        Fixed day off
+        <select id="fdo">
+          <option value="">None</option>
+          <option value="0">Mon</option>
+          <option value="1">Tue</option>
+          <option value="2">Wed</option>
+          <option value="3">Thu</option>
+          <option value="4">Fri</option>
+          <option value="5">Sat</option>
+          <option value="6">Sun</option>
+        </select>
+      </label>
+  <label><input id="comet" type="checkbox"> COMET eligible</label>
+  <label>Start date <input id="start" type="date"></label>
+  <label>AL days <input id="al_days" type="number" min="0" placeholder="Annual leave days"></label>
+  <label>CPD <input id="cpd_ent" type="number" min="0" placeholder="per 6 mo"></label>
+      <button onclick="savePerson()">Save</button>
+      <button onclick="savePersonNext()">Save & Next</button>
+      <button onclick="setForm(null)">Clear</button>
+      <button onclick="importSamplePeople()">Import Sample People</button>
+      <button onclick="clearPeople()">Clear People</button>
+    </div>
+    <table id="people">
+      <thead>
+        <tr><th>ID</th><th>Name</th><th>Grade</th><th>WTE</th><th>FDO</th><th>COMET</th><th>Start</th><th>Actions</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+  <section>
+    <h3>Locum Diagnostics</h3>
+    <div id="debug_panel" style="overflow:auto; max-width:100%;"></div>
+  </section>
+
+  <section>
+    <h3>Run Solve (using stored people) <span id="relaxed_badge" class="badge" style="display:none; background:#fff3cd; color:#8a6d3b; border-color:#f0e1a1;">Relaxed mode</span></h3>
+    <div class="row" id="solve_summary" style="gap:16px; color:#444;">
+      <div><strong>People:</strong> <span data-k="people">0</span></div>
+      <div><strong>Preassignments:</strong> <span data-k="preassign">0</span></div>
+      <div><strong>Horizon days:</strong> <span data-k="days">0</span></div>
+      <div><strong>Bank holidays:</strong> <span data-k="bh">0</span></div>
+      <div><strong>COMET weeks:</strong> <span data-k="comet">0</span></div>
+      <div><strong>IND days:</strong> <span data-k="ind">0</span></div>
+      <div><strong>TREG days:</strong> <span data-k="treg">0</span></div>
+      <div><strong>TSHO days:</strong> <span data-k="tsho">0</span></div>
+      <div><strong>Unit teach:</strong> <span data-k="tunit">0</span></div>
+    </div>
+    <div class="row">
+      <label>Start <input id="cfg_start" type="date"></label>
+      <label>End <input id="cfg_end" type="date"></label>
+  <input id="cfg_bh" placeholder="Bank holidays (YYYY-MM-DD, comma-separated)">
+  <span>
+    <input id="cfg_comet" placeholder="COMET Mondays (YYYY-MM-DD, comma-separated)">
+    <label>First COMET Monday <input id="comet_first_monday" type="date"></label>
+    <button type="button" onclick="seedCometFromFirstMonday()">Seed alternate weeks</button>
+  </span>
+  <details>
+    <summary>Induction and Teaching days</summary>
+    <div class="row">
+      <label>Induction <input id="ind_date" type="date"></label>
+      <button type="button" onclick="addGlobalDate('ind')">Add</button>
+      <button type="button" data-cal-launch="ind">Select many…</button>
+      <div id="ind_list" class="chips"></div>
+    </div>
+    <div class="row">
+      <label>Registrar teaching <input id="treg_date" type="date"></label>
+      <button type="button" onclick="addGlobalDate('treg')">Add</button>
+      <button type="button" data-cal-launch="treg">Select many…</button>
+      <div id="treg_list" class="chips"></div>
+    </div>
+    <div class="row">
+      <label>SHO teaching <input id="tsho_date" type="date"></label>
+      <button type="button" onclick="addGlobalDate('tsho')">Add</button>
+      <button type="button" data-cal-launch="tsho">Select many…</button>
+      <div id="tsho_list" class="chips"></div>
+    </div>
+    <div class="row">
+      <label>Unit teaching <input id="tunit_date" type="date"></label>
+      <button type="button" onclick="addGlobalDate('tunit')">Add</button>
+      <button type="button" data-cal-launch="tunit">Select many…</button>
+      <div id="tunit_list" class="chips"></div>
+    </div>
+  </details>
+  <button onclick="runSolve()">Solve</button>
+  <button onclick="runSolve()">Rerun with Edits</button>
+      <button onclick="seedBankHolidays()">Seed UK Bank Holidays</button>
+      <button onclick="prefillDatasetDates()">Prefill Dataset Dates</button>
+      <button onclick="exportCsv()">Export CSV</button>
+      <button onclick="updateSummary()">Refresh Summary</button>
+      <button onclick="exportStatsCsv()">Export Stats CSV</button>
+    </div>
+    <pre id="solve_out" style="background:#f7f7f7; padding:8px; border:1px solid #ccc; margin-top:8px;"></pre>
+  <pre id="progress_log" style="background:#0b1021; color:#e0e6ff; padding:8px; border:1px solid #334; margin-top:8px; height:140px; overflow:auto;"></pre>
+    <div style="overflow:auto; max-width:100%;">
+      <table id="roster">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div style="margin-top:8px; overflow:auto; max-width:100%;">
+      <h4>Per-person stats</h4>
+      <table id="stats">
+        <thead>
+          <tr>
+            <th data-key="name">Person</th>
+            <th data-key="grade">Grade</th>
+            <th data-key="wte">WTE</th>
+            <th data-key="avg_weekly_hours">Avg weekly hours</th>
+            <th data-key="long_days">Long days</th>
+            <th data-key="nights">Nights</th>
+            <th data-key="ld_equiv">LD-equivalent</th>
+            <th data-key="n_equiv">N-equivalent</th>
+            <th data-key="weekends">Weekends</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr><td colspan="9" id="stats_agg"></td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- Calendar Modal -->
+  <div id="cal_modal" class="modal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <strong>Select dates</strong>
+        <button id="cal_close" type="button">×</button>
+      </div>
+      <div id="cal_body"></div>
+      <div style="text-align:right; margin-top:8px;">
+        <button id="cal_cancel" type="button">Cancel</button>
+        <button id="cal_apply" type="button">Add selected</button>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <h3>Preassignments (Teaching/CPD/IND/Leave) <span id="preassign_count" class="badge">0</span></h3>
+    <div class="row">
+      <input id="pre_date" type="date">
+      <input id="pre_person" placeholder="Person ID">
+      <select id="pre_shift">
+        <option value="CPD">CPD (day)</option>
+        <option value="TREG">Registrar Teaching</option>
+        <option value="TSHO">SHO Teaching</option>
+        <option value="TPCCU">PCCU Teaching</option>
+        <option value="IND">Induction</option>
+        <option value="OFF">Leave/Off</option>
+      </select>
+      <button onclick="addPreassignment()">Add</button>
+      <button onclick="clearPreassignments()">Clear All</button>
+    </div>
+    <div class="row">
+      <strong>Leave range:</strong>
+      <input id="leave_person" placeholder="Person ID">
+      <label>Start <input id="leave_start" type="date"></label>
+      <label>End <input id="leave_end" type="date"></label>
+      <button onclick="addLeaveRange()">Add Leave Range</button>
+    </div>
+    <table id="preassign">
+      <thead><tr><th>Date</th><th>Person</th><th>Shift</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</body>
+<div id="toast"></div>
+</html>

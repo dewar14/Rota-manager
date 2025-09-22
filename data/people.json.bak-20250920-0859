@@ -1,0 +1,101 @@
+[
+  {
+    "id": "r1",
+    "name": "Dr Reg One",
+    "grade": "Registrar",
+    "wte": 1.0,
+    "fixed_day_off": null,
+    "comet_eligible": true,
+    "start_date": null,
+    "annual_leave_days": 13,
+    "cpd_entitlement": 6
+  },
+  {
+    "id": "r2",
+    "name": "Dr Reg Two",
+    "grade": "Registrar",
+    "wte": 1.0,
+    "fixed_day_off": null,
+    "comet_eligible": true,
+    "start_date": null,
+    "annual_leave_days": 13,
+    "cpd_entitlement": 6
+  },
+  {
+    "id": "s2",
+    "name": "Dr SHO Two",
+    "grade": "SHO",
+    "wte": 0.8,
+    "fixed_day_off": 2,
+    "comet_eligible": false,
+    "start_date": null,
+    "annual_leave_days": null,
+    "cpd_entitlement": null
+  },
+  {
+    "id": "u1",
+    "name": "Dr Sup One",
+    "grade": "Supernumerary",
+    "wte": 1.0,
+    "fixed_day_off": null,
+    "comet_eligible": false,
+    "start_date": null,
+    "annual_leave_days": null,
+    "cpd_entitlement": null
+  },
+  {
+    "id": "r3",
+    "name": "Dr Reg Three",
+    "grade": "Registrar",
+    "wte": 0.6,
+    "fixed_day_off": 4,
+    "comet_eligible": false,
+    "start_date": null,
+    "annual_leave_days": 9,
+    "cpd_entitlement": 4
+  },
+  {
+    "id": "S1",
+    "name": "Arthur",
+    "grade": "SHO",
+    "wte": 1.0,
+    "fixed_day_off": null,
+    "comet_eligible": false,
+    "start_date": null,
+    "annual_leave_days": 13,
+    "cpd_entitlement": 6
+  },
+  {
+    "id": "S3",
+    "name": "Hannah",
+    "grade": "SHO",
+    "wte": 1.0,
+    "fixed_day_off": null,
+    "comet_eligible": false,
+    "start_date": null,
+    "annual_leave_days": 13,
+    "cpd_entitlement": 6
+  },
+  {
+    "id": "S4",
+    "name": "Brinalda",
+    "grade": "SHO",
+    "wte": 0.8,
+    "fixed_day_off": null,
+    "comet_eligible": false,
+    "start_date": null,
+    "annual_leave_days": 11,
+    "cpd_entitlement": 5
+  },
+  {
+    "id": "S5",
+    "name": "Alex",
+    "grade": "SHO",
+    "wte": 0.6,
+    "fixed_day_off": null,
+    "comet_eligible": false,
+    "start_date": null,
+    "annual_leave_days": 9,
+    "cpd_entitlement": 5
+  }
+]
