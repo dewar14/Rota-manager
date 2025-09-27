@@ -13,14 +13,30 @@ def load_csv(path: str) -> pd.DataFrame:
 # Count helper: returns (ld_sho, ld_reg, n_sho, n_reg, cmd, cmn, sd_total)
 # Infer SHO/Reg by column headers (ids) not always available; we just count by shift code across all people columns.
 # Locum columns in our output already explicit; target may not have them.
-SHIFT_CODES = {"SD","LD","N","CMD","CMN","CPD","TREG","TSHO","TPCCU","IND","OFF"}
+SHIFT_CODES = {
+    "SD",
+    "LDS",
+    "LDR",
+    "NS",
+    "NR",
+    "CMD",
+    "CMN",
+    "CPD",
+    "TREG",
+    "TSHO",
+    "TPCCU",
+    "IND",
+    "LV",
+    "SLV",
+    "LTFT",
+    "OFF",
+}
 
 def count_cover(row: pd.Series):
-    vals = [str(v).strip() for v in row.values]
-    # Remove known locum columns from our roster if present
-    vals = [v for k,v in row.items() if not str(k).startswith('LOC_')]
-    ld = sum(1 for v in vals if v == 'LD')
-    n  = sum(1 for v in vals if v == 'N')
+    # Remove known locum columns from our roster if present and normalise values
+    vals = [str(v).strip() for k, v in row.items() if not str(k).startswith('LOC_')]
+    ld = sum(1 for v in vals if v in {'LDR', 'LDS'})
+    n  = sum(1 for v in vals if v in {'NR', 'NS'})
     cmd = sum(1 for v in vals if v == 'CMD')
     cmn = sum(1 for v in vals if v == 'CMN')
     sd  = sum(1 for v in vals if v == 'SD')

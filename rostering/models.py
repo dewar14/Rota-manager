@@ -34,13 +34,23 @@ class Config(BaseModel):
     global_unit_teaching_days: List[dt.date] = []
 
 class Weights(BaseModel):
+    cover_priority_comet: int = 1_000_000
+    cover_priority_night: int = 800_000
+    cover_priority_weekend_ld: int = 600_000
+    cover_priority_bank_holiday_ld: int = 550_000
+    cover_priority_weekday_ld: int = 500_000
+    cover_priority_weekday_sd: int = 250_000
     locum: int = 5000  # Significantly increased but not excessive
     single_night_penalty: int = 30
     fairness_variance: int = 20
     fairness_band_penalty: int = 15
+    training_band_penalty: int = 12
+    training_nonattendance_penalty: int = 25
     weekday_day_target_penalty: int = 4
     winter_extra_day_penalty: int = 2
     weekend_split_penalty: int = 25  # Moderate increase
+    weekend_pair_penalty: int = 120
+    weekend_firm_penalty: int = 80
     preassign_violation: int = 200
     fdo_violation: int = 50
     min_weekly_hours_penalty: int = 5

@@ -13,13 +13,16 @@
     th { background: #f7f7f7; }
   /* Shift color coding */
   .code-SD { background:#fff3b0; }
-  .code-LD { background:#dff5e1; }
-  .code-N { background:#ffd6d6; }
+  .code-LDR, .code-LDS { background:#dff5e1; }
+  .code-NR, .code-NS { background:#ffd6d6; }
   .code-CMD { background:#ead9ff; }
   .code-CMN { background:#ffe1c6; }
-  .code-CPD { background:#e0f0ff; }
+  .code-CPD { background:#ffe2b8; }
   .code-TREG, .code-TSHO, .code-TPCCU { background:#e3f2fd; }
   .code-IND { background:#eeeeee; }
+  .code-LV { background:#d6ebff; }
+  .code-SLV { background:#dcf8dc; }
+  .code-LTFT { background:#ffffff; }
   .code-OFF { color:#888; }
   .code-LOCUM { background:#ffecec; font-weight:600; }
   .bh { background:#f0f7ff; border-color:#bcd9ff; }
@@ -50,7 +53,7 @@
   let PREASSIGN_CACHE = [];
   let LAST_RESULT = null;
   let STATS_SORT = { key: 'name', dir: 'asc' };
-  const EDITABLE_SHIFTS = ['OFF','LD','N','CMD','CMN','CPD','TREG','TSHO','TPCCU','IND',''];
+  const EDITABLE_SHIFTS = ['OFF','SD','LDR','LDS','NR','NS','CMD','CMN','CPD','TREG','TSHO','TPCCU','IND','LV','SLV','LTFT',''];
 
   // Global days helpers (induction/teaching)
   function listDates(kind){
@@ -291,10 +294,10 @@
         const r = result.roster[d] || {};
         const count = (pred)=> Object.keys(r).filter(k=>!k.startsWith('LOC_') && pred(r[k], k)).length;
         const countLocum = (key)=> (r[key] === 'LOCUM') ? 1 : 0;
-        const shoLD = count((v,k)=> v==='LD' && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='SHO')) + countLocum('LOC_SHO_LD');
-        const regLD = count((v,k)=> v==='LD' && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='Registrar')) + countLocum('LOC_REG_LD');
-        const shoN  = count((v,k)=> v==='N'  && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='SHO')) + countLocum('LOC_SHO_N');
-        const regN  = count((v,k)=> v==='N'  && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='Registrar')) + countLocum('LOC_REG_N');
+        const shoLD = count((v,k)=> v==='LDS' && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='SHO')) + countLocum('LOC_SHO_LD');
+        const regLD = count((v,k)=> v==='LDR' && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='Registrar')) + countLocum('LOC_REG_LD');
+        const shoN  = count((v,k)=> v==='NS'  && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='SHO')) + countLocum('LOC_SHO_N');
+        const regN  = count((v,k)=> v==='NR'  && PEOPLE_CACHE.find(p=>p.id===k && p.grade==='Registrar')) + countLocum('LOC_REG_N');
         const cmd   = count((v,k)=> v==='CMD') + countLocum('LOC_REG_CMD');
         const cmn   = count((v,k)=> v==='CMN') + countLocum('LOC_REG_CMN');
         const sdNS  = count((v,k)=> v==='SD' && PEOPLE_CACHE.find(p=>p.id===k && p.grade!=='Supernumerary')); // exclude supernumerary

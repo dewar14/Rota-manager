@@ -2,8 +2,9 @@ from ortools.sat.python import cp_model
 from typing import Dict
 import pandas as pd
 import datetime as dt
+import math
 from rostering.models import ProblemInput, SolveResult
-from rostering.constraints import add_core_constraints, soft_objective
+from rostering.constraints import add_core_constraints, soft_objective, PERSON_SHIFT_CODES, WORK_SHIFT_CODES
 
 def _solve(problem: ProblemInput):
     # Pass 1: nights-only to stabilize night allocation
@@ -18,10 +19,9 @@ def _solve(problem: ProblemInput):
     if solver1_res in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         for p_idx in range(len(people)):
             for d_idx in range(len(days)):
-                if int(solver1.Value(x1[p_idx, d_idx, 'N'])) == 1:
-                    freeze.append((p_idx, d_idx, 'N'))
-                if int(solver1.Value(x1[p_idx, d_idx, 'CMN'])) == 1:
-                    freeze.append((p_idx, d_idx, 'CMN'))
+                for code in ('NS', 'NR', 'CMN'):
+                    if (p_idx, d_idx, code) in x1 and int(solver1.Value(x1[p_idx, d_idx, code])) == 1:
+                        freeze.append((p_idx, d_idx, code))
     # Pass 2: full objective with frozen nights
     model = cp_model.CpModel()
     x, locums, days, people = add_core_constraints(problem, model, options={"freeze_nights": freeze})
@@ -34,11 +34,16 @@ def _solve(problem: ProblemInput):
         for (p_idx, d_idx, s) in freeze:
             hinted_vars.append(x[p_idx, d_idx, s])
             hinted_vals.append(1)
-            # Also hint the other night-type to 0 to reduce flips
-            other = "CMN" if s == "N" else "N"
-            if (p_idx, d_idx, other) in x:
-                hinted_vars.append(x[p_idx, d_idx, other])
-                hinted_vals.append(0)
+            # Also hint paired registrar night types to 0 to reduce flips
+            others: list[str] = []
+            if s == "NR":
+                others = ["CMN"]
+            elif s == "CMN":
+                others = ["NR"]
+            for other in others:
+                if (p_idx, d_idx, other) in x:
+                    hinted_vars.append(x[p_idx, d_idx, other])
+                    hinted_vals.append(0)
         if hinted_vars:
             model.AddHint(hinted_vars, hinted_vals)
     except Exception:
@@ -77,10 +82,10 @@ def solve_nights_only(problem: ProblemInput) -> SolveResult:
         roster[dkey] = {}
         for p_idx, person in enumerate(people):
             code = "OFF"
-            if int(solver.Value(x[p_idx, d_idx, 'N'])) == 1:
-                code = 'N'
-            elif int(solver.Value(x[p_idx, d_idx, 'CMN'])) == 1:
-                code = 'CMN'
+            for night_code in ('NS', 'NR', 'CMN'):
+                if (p_idx, d_idx, night_code) in x and int(solver.Value(x[p_idx, d_idx, night_code])) == 1:
+                    code = night_code
+                    break
             roster[dkey][person.id] = code
         # Locum columns for nights
         roster[dkey]["LOC_SHO_N"] = "LOCUM" if int(solver.Value(locums["loc_n_sho"][d_idx])) > 0 else ""
@@ -131,9 +136,10 @@ def solve_roster(problem: ProblemInput) -> SolveResult:
         roster[dkey] = {}
         for p_idx, person in enumerate(people):
             code = "OFF"
-            for s in ["SD","LD","N","CMD","CMN","CPD","TREG","TSHO","TPCCU","IND"]:
-                if solver.Value(x[p_idx,d_idx,s]) == 1:
+            for s in PERSON_SHIFT_CODES:
+                if solver.Value(x[p_idx, d_idx, s]) == 1:
                     code = s
+                    break
             roster[dkey][person.id] = code
 
         # Add explicit locum columns for this day based on locum variables
@@ -179,7 +185,10 @@ def solve_roster(problem: ProblemInput) -> SolveResult:
         "n_reg": [],
         "n_sho": [],
         "comet_day": [],
-        "comet_night": []
+        "comet_night": [],
+        "firm_weekend_frequency": [],
+        "firm_weekend_pairs": [],
+        "training_attendance": []
     }
     for d_idx, day in enumerate(days):
         d = day.isoformat()
@@ -200,7 +209,24 @@ def solve_roster(problem: ProblemInput) -> SolveResult:
             breaches["comet_night"].append(d)
 
     # Per-person stats: avg weekly hours, LD, nights, weekends, LD/N equivalents
-    shift_hours = {"SD":9,"LD":13,"N":12,"CMD":12,"CMN":12,"CPD":9,"TREG":9,"TSHO":9,"TPCCU":9,"IND":9,"OFF":0}
+    shift_hours = {
+        "SD": 9,
+        "LDS": 13,
+        "LDR": 13,
+        "NS": 13,
+        "NR": 13,
+        "CMD": 12,
+        "CMN": 12,
+        "CPD": 9,
+        "TREG": 9,
+        "TSHO": 9,
+        "TPCCU": 9,
+        "IND": 9,
+        "LV": 9,
+        "SLV": 9,
+        "LTFT": 0,
+        "OFF": 0,
+    }
     days_count = len(days)
     weeks = days_count/7.0 if days_count > 0 else 0.0
     per_person: Dict[str, Dict[str, float | int | str]] = {}
@@ -217,29 +243,59 @@ def solve_roster(problem: ProblemInput) -> SolveResult:
         nights = 0
         ld_equiv = 0
         n_equiv = 0
+        reg_training = 0
+        sho_training = 0
+        unit_training = 0
+        cpd_days = 0
+        leave_days = 0
+        study_days = 0
+        induction_days = 0
         # Sum hours and counts
         for d_idx, day in enumerate(days):
             code = roster[day.isoformat()][person.id]
             total_hours += shift_hours.get(code, 0)
-            if code in ("LD","CMD"):
+            if code in ("LDR", "LDS", "CMD"):
                 long_days += 1
                 ld_equiv += 1
-            if code in ("N","CMN"):
+            if code in ("NR", "NS", "CMN"):
                 nights += 1
                 n_equiv += 1
+            if code == "TREG":
+                reg_training += 1
+            if code == "TSHO":
+                sho_training += 1
+            if code == "TPCCU":
+                unit_training += 1
+            if code == "CPD":
+                cpd_days += 1
+            if code == "LV":
+                leave_days += 1
+            if code == "SLV":
+                study_days += 1
+            if code == "IND":
+                induction_days += 1
         # Weekends worked: any non-OFF assignment on Sat or Sun
         weekends = 0
+        weekend_split_details = []
         for sat, sun in weekend_blocks:
-            worked = False
             sat_code = roster[days[sat].isoformat()][person.id]
-            if sat_code and sat_code != "OFF":
-                worked = True
-            if not worked and sun is not None:
+            worked_sat = sat_code in WORK_SHIFT_CODES
+            worked_sun = False
+            if sun is not None:
                 sun_code = roster[days[sun].isoformat()][person.id]
-                if sun_code and sun_code != "OFF":
-                    worked = True
-            if worked:
+                worked_sun = sun_code in WORK_SHIFT_CODES
+            if worked_sat or worked_sun:
                 weekends += 1
+            if sun is not None and worked_sat != worked_sun:
+                worked_days = []
+                if worked_sat:
+                    worked_days.append("sat")
+                if worked_sun:
+                    worked_days.append("sun")
+                weekend_split_details.append({
+                    "weekend_start": days[sat].isoformat(),
+                    "worked_days": worked_days
+                })
         avg_weekly_hours = (total_hours / weeks) if weeks > 0 else 0.0
         per_person[person.id] = {
             "name": person.name,
@@ -251,7 +307,98 @@ def solve_roster(problem: ProblemInput) -> SolveResult:
             "ld_equiv": int(ld_equiv),
             "n_equiv": int(n_equiv),
             "weekends": int(weekends),
+            "registrar_training_days": int(reg_training),
+            "sho_training_days": int(sho_training),
+            "unit_training_days": int(unit_training),
+            "cpd_days": int(cpd_days),
+            "leave_days": int(leave_days),
+            "study_leave_days": int(study_days),
+            "induction_days": int(induction_days),
         }
+        if weekend_split_details:
+            per_person[person.id]["weekend_single_days"] = weekend_split_details
+
+    # Compute firm weekend breaches and training fairness diagnostics
+    weekend_caps = locums.get("weekend_firm_caps", {})
+    def training_band_bounds(target: float, band: float = 0.33) -> tuple[int, int]:
+        if target <= 0:
+            return 0, 0
+        if target < 1:
+            return 0, max(1, math.ceil(target + 1))
+        lower = max(0, math.floor(target * (1 - band)))
+        upper = max(lower, math.ceil(target * (1 + band)))
+        return lower, upper
+
+    reg_training_days = sorted(problem.config.global_registrar_teaching_days or [])
+    sho_training_days = sorted(problem.config.global_sho_teaching_days or [])
+    unit_training_days = sorted(problem.config.global_unit_teaching_days or [])
+
+    for p_idx, person in enumerate(people):
+        pid = person.id
+        pdata = per_person.get(pid, {})
+        worked_weekends = int(pdata.get("weekends", 0))
+        firm_cap = weekend_caps.get(p_idx, 0)
+        if worked_weekends > firm_cap:
+            breaches["firm_weekend_frequency"].append({
+                "person_id": pid,
+                "worked_weekends": worked_weekends,
+                "firm_cap": firm_cap
+            })
+        split_info = pdata.get("weekend_single_days", [])
+        for entry in split_info:
+            breaches["firm_weekend_pairs"].append({
+                "person_id": pid,
+                **entry
+            })
+
+        start_date = person.start_date or problem.config.start_date
+        wte = getattr(person, "wte", 1.0) or 1.0
+        wte = max(0.2, min(1.0, float(wte)))
+
+        if person.grade == "Registrar" and reg_training_days:
+            available = sum(1 for d in reg_training_days if d >= start_date)
+            target = available * wte
+            low, high = training_band_bounds(target)
+            pdata["registrar_training_window"] = {"min": low, "max": high}
+            actual = int(pdata.get("registrar_training_days", 0))
+            if available and (actual < low or actual > high):
+                breaches["training_attendance"].append({
+                    "person_id": pid,
+                    "type": "registrar",
+                    "actual": actual,
+                    "min_expected": low,
+                    "max_expected": high
+                })
+
+        if person.grade == "SHO" and sho_training_days:
+            available = sum(1 for d in sho_training_days if d >= start_date)
+            target = available * wte
+            low, high = training_band_bounds(target)
+            pdata["sho_training_window"] = {"min": low, "max": high}
+            actual = int(pdata.get("sho_training_days", 0))
+            if available and (actual < low or actual > high):
+                breaches["training_attendance"].append({
+                    "person_id": pid,
+                    "type": "sho",
+                    "actual": actual,
+                    "min_expected": low,
+                    "max_expected": high
+                })
+
+        if unit_training_days:
+            available = sum(1 for d in unit_training_days if d >= start_date)
+            target = available * wte
+            low, high = training_band_bounds(target)
+            pdata["unit_training_window"] = {"min": low, "max": high}
+            actual = int(pdata.get("unit_training_days", 0))
+            if available and (actual < low or actual > high):
+                breaches["training_attendance"].append({
+                    "person_id": pid,
+                    "type": "unit",
+                    "actual": actual,
+                    "min_expected": low,
+                    "max_expected": high
+                })
     summary["per_person"] = per_person
 
     # Aggregates: overall and by-grade for LD/N equivalents; registrar detail map

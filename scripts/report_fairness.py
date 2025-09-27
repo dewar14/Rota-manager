@@ -33,8 +33,16 @@ def ld_n_counts(pid: str):
     if pid not in df.columns:
         return 0, 0
     col = df[pid].astype(str)
-    ld = int((col == "LD").sum())
-    n = int((col == "N").sum())
+    grade = people[pid].get("grade")
+    if grade == "SHO":
+        ld = int((col == "LDS").sum())
+        n = int((col == "NS").sum())
+    elif grade == "Registrar":
+        ld = int(((col == "LDR") | (col == "CMD")).sum())
+        n = int(((col == "NR") | (col == "CMN")).sum())
+    else:
+        ld = int(((col == "LDR") | (col == "LDS") | (col == "CMD")).sum())
+        n = int(((col == "NR") | (col == "NS") | (col == "CMN")).sum())
     return ld, n
 
 def active_days_for(pid: str):
