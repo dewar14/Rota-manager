@@ -1,8 +1,8 @@
 from ortools.sat.python import cp_model
-from typing import Dict, Tuple, List, Set
+from typing import Dict, Tuple, List
 import datetime as dt
 from dateutil.rrule import rrule, DAILY
-from rostering.models import ProblemInput
+from rostering.models import ProblemInput, ShiftType, SHIFT_DEFINITIONS
 
 ShiftCode = str
 Var = cp_model.IntVar
@@ -18,164 +18,312 @@ def is_monday(d: dt.date) -> bool:
     return d.weekday() == 0
 
 def build_index(problem: ProblemInput):
-    # Calendar
+    """Build day and person indices for the problem."""
     days = list(daterange(problem.config.start_date, problem.config.end_date))
     day_index = {d:i for i,d in enumerate(days)}
-    # People filtered by start_date
+    
+    # Filter people by start_date
     people = [p for p in problem.people if (p.start_date is None or p.start_date <= problem.config.end_date)]
     person_index = {p.id:i for i,p in enumerate(people)}
+    
     return days, day_index, people, person_index
 
-def basic_shift_catalog():
-    # code, label, hours, count_in_cover, grade_requirement
-    return {
-        "SD":  ("Short Day", 9.0, True, None),           # 08:30-17:30
-        "LD":  ("Long Day", 13.0, True, None),           # 08:30-21:30
-        "N":   ("Night", 12.0, True, None),              # 20:30-08:30
-        "CMD": ("COMET Day", 12.0, True, "Registrar"),
-        "CMN": ("COMET Night", 12.0, True, "Registrar"),
-        "CPD": ("CPD", 9.0, False, None),
-        "TREG":("Registrar Teaching", 9.0, False, None),
-        "TSHO":("SHO Teaching", 9.0, False, None),
-        "TPCCU":("PCCU Teaching", 9.0, False, None),
-        "IND": ("Induction", 9.0, False, None),
-        "OFF": ("Off", 0.0, False, None),
-        "LOC": ("Locum", 0.0, True, None)  # virtual coverage, not assigned to persons
-    }
-
 def add_core_constraints(problem: ProblemInput, model: cp_model.CpModel):
+    """Add basic constraints and decision variables."""
+    
     days, day_index, people, person_index = build_index(problem)
-    S = basic_shift_catalog()
+    
     P = range(len(people))
     D = range(len(days))
-    shift_codes = ["SD","LD","N","CMD","CMN","CPD","TREG","TSHO","TPCCU","IND","OFF"]
-    # Decision vars: x[p,d,s] ∈ {0,1}
-    x: Dict[Tuple[int,int,str], Var] = {}
+    
+    # All possible shift assignments
+    shift_codes = list(ShiftType)
+    
+    # Decision variables: x[p,d,s] ∈ {0,1} - person p on day d assigned shift s
+    x: Dict[Tuple[int,int,ShiftType], Var] = {}
     for p in P:
         for d in D:
             for s in shift_codes:
-                x[p,d,s] = model.NewBoolVar(f"x_p{p}_d{d}_{s}")
-    # Locum coverage slack per day/shift category (for cover counts)
-    loc_ld_reg = [model.NewIntVar(0, 1, f"loc_ld_reg_d{d}") for d in D]
-    loc_ld_sho = [model.NewIntVar(0, 1, f"loc_ld_sho_d{d}") for d in D]
-    loc_sd_any = [model.NewIntVar(0, 5, f"loc_sd_any_d{d}") for d in D]
-    loc_n_reg  = [model.NewIntVar(0, 1, f"loc_n_reg_d{d}")  for d in D]
-    loc_n_sho  = [model.NewIntVar(0, 1, f"loc_n_sho_d{d}")  for d in D]
-    loc_cmd    = [model.NewIntVar(0, 1, f"loc_cmd_d{d}")    for d in D]
-    loc_cmn    = [model.NewIntVar(0, 1, f"loc_cmn_d{d}")    for d in D]
-
-    # Helper sets
+                x[p,d,s] = model.NewBoolVar(f"x_p{p}_d{d}_{s.value}")
+    
+    # Locum coverage variables (slack for unmet requirements)
+    locum_vars = create_locum_variables(model, D)
+    
+    # Helper sets by grade
     reg_ids = {i for i,p in enumerate(people) if p.grade == "Registrar"}
     sho_ids = {i for i,p in enumerate(people) if p.grade == "SHO"}
     sup_ids = {i for i,p in enumerate(people) if p.grade == "Supernumerary"}
-
-    # 1) At most one assigned shift per person per day
+    comet_eligible = {i for i,p in enumerate(people) if p.comet_eligible}
+    
+    # BASIC CONSTRAINTS
+    
+    # 1) Exactly one shift per person per day (including OFF)
     for p in P:
         for d in D:
-            model.Add(sum(x[p,d,s] for s in shift_codes if s != "OFF") <= 1)
+            model.Add(sum(x[p,d,s] for s in shift_codes) == 1)
+    
+    # 2) Grade restrictions
+    add_grade_restrictions(model, x, P, D, reg_ids, sho_ids, sup_ids, shift_codes)
+    
+    # 3) Fixed LTFT days
+    add_ltft_constraints(model, x, people, days, P, D)
+    
+    # 4) CoMET eligibility
+    add_comet_constraints(model, x, people, days, problem.config, P, D, comet_eligible)
+    
+    # 5) Training day assignments
+    add_training_constraints(model, x, people, days, problem.config, P, D)
+    
+    # 6) Coverage requirements
+    add_coverage_constraints(model, x, locum_vars, days, problem.config, P, D, reg_ids, sho_ids)
+    
+    return x, locum_vars, days, people
 
-    # 2) Supernumerary only SD (short day) or OFF/CPD/TEACH/IND (no LD/N/COMET)
-    banned_for_sup = ["LD","N","CMD","CMN"]
+def create_locum_variables(model: cp_model.CpModel, D):
+    """Create locum slack variables for coverage requirements."""
+    return {
+        "long_day_reg": [model.NewIntVar(0, 1, f"locum_ld_reg_d{d}") for d in D],
+        "long_day_sho": [model.NewIntVar(0, 1, f"locum_ld_sho_d{d}") for d in D],
+        "night_reg": [model.NewIntVar(0, 1, f"locum_n_reg_d{d}") for d in D],
+        "night_sho": [model.NewIntVar(0, 1, f"locum_n_sho_d{d}") for d in D],
+        "short_day": [model.NewIntVar(0, 5, f"locum_sd_d{d}") for d in D],
+        "comet_day": [model.NewIntVar(0, 1, f"locum_cmd_d{d}") for d in D],
+        "comet_night": [model.NewIntVar(0, 1, f"locum_cmn_d{d}") for d in D],
+    }
+
+def add_grade_restrictions(model, x, P, D, reg_ids, sho_ids, sup_ids, shift_codes):
+    """Add constraints based on staff grade restrictions."""
+    
+    # Supernumerary restrictions (only SHORT_DAY, training, or OFF)
+    allowed_for_sup = [ShiftType.SHORT_DAY, ShiftType.CPD, ShiftType.UNIT_TRAINING, 
+                      ShiftType.INDUCTION, ShiftType.LEAVE, ShiftType.STUDY_LEAVE, 
+                      ShiftType.LTFT, ShiftType.OFF]
+    
     for p in sup_ids:
         for d in D:
-            for s in banned_for_sup:
-                model.Add(x[p,d,s] == 0)
+            for s in shift_codes:
+                if s not in allowed_for_sup:
+                    model.Add(x[p,d,s] == 0)
+    
+    # Grade-specific shift restrictions
+    for p in P:
+        for d in D:
+            # Long day registrar only for registrars
+            if p not in reg_ids:
+                model.Add(x[p,d,ShiftType.LONG_DAY_REG] == 0)
+            
+            # Long day SHO only for SHOs  
+            if p not in sho_ids:
+                model.Add(x[p,d,ShiftType.LONG_DAY_SHO] == 0)
+                
+            # Night registrar only for registrars
+            if p not in reg_ids:
+                model.Add(x[p,d,ShiftType.NIGHT_REG] == 0)
+                
+            # Night SHO only for SHOs
+            if p not in sho_ids:
+                model.Add(x[p,d,ShiftType.NIGHT_SHO] == 0)
+                
+            # CoMET shifts only for registrars
+            if p not in reg_ids:
+                model.Add(x[p,d,ShiftType.COMET_DAY] == 0)
+                model.Add(x[p,d,ShiftType.COMET_NIGHT] == 0)
 
-    # 3) Fixed LTFT day off (hard unless manually overridden upstream)
+def add_ltft_constraints(model, x, people, days, P, D):
+    """Add Less Than Full Time (LTFT) fixed day off constraints."""
+    
     for p_idx, person in enumerate(people):
         if person.fixed_day_off is not None and person.wte < 1.0:
             for d_idx, day in enumerate(days):
                 if day.weekday() == person.fixed_day_off:
-                    model.Add(sum(x[p_idx,d_idx,s] for s in shift_codes if s != "OFF") == 0)
+                    # Must be OFF or LTFT on fixed day off
+                    model.Add(x[p_idx, d_idx, ShiftType.LTFT] == 1)
 
-    # 4) Coverage requirements
+def add_comet_constraints(model, x, people, days, config, P, D, comet_eligible):
+    """Add CoMET week constraints."""
+    
     for d_idx, day in enumerate(days):
-        wknd = is_weekend(day) or (day in problem.config.bank_holidays)
-
-        # Long Days: weekdays need exactly 1 Reg + 1 SHO; weekends/bank holidays also exactly 1 each
-        model.Add(sum(x[p,d_idx,"LD"] for p in reg_ids) + loc_ld_reg[d_idx] == 1)
-        model.Add(sum(x[p,d_idx,"LD"] for p in sho_ids) + loc_ld_sho[d_idx] == 1)
-
-        # Short Day: weekdays need at least 1 additional clinician (any grade), target 4 total (soft); weekends/bank holidays no SDs
-        if not wknd:
-            model.Add(sum(x[p,d_idx,"SD"] for p in P if p not in sup_ids) + loc_sd_any[d_idx] >= 1)
-            # cap total day clinicians by config.max_day_clinicians — accounted in soft objective only (not hard cap).
-        else:
+        # Check if this day falls in a CoMET week
+        is_comet_week = False
+        for comet_monday in config.comet_on_weeks:
+            week_start = comet_monday
+            week_end = comet_monday + dt.timedelta(days=6)
+            if week_start <= day <= week_end:
+                is_comet_week = True
+                break
+        
+        if is_comet_week:
+            # CoMET shifts only for eligible registrars
             for p in P:
-                model.Add(x[p,d_idx,"SD"] == 0)
-
-        # Nights: exactly 1 Reg + 1 SHO
-        model.Add(sum(x[p,d_idx,"N"] for p in reg_ids) + loc_n_reg[d_idx] == 1)
-        model.Add(sum(x[p,d_idx,"N"] for p in sho_ids) + loc_n_sho[d_idx] == 1)
-
-        # COMET shifts only if this week is an "on" week (marked by Monday in config)
-        if any((monday == day if is_monday(day) else monday <= day <= monday + dt.timedelta(days=6)) for monday in problem.config.comet_on_weeks):
-            # exactly 1 CMD and 1 CMN by comet-eligible registrars
-            model.Add(sum(x[p,d_idx,"CMD"] for p in reg_ids) + loc_cmd[d_idx] == 1)
-            model.Add(sum(x[p,d_idx,"CMN"] for p in reg_ids) + loc_cmn[d_idx] == 1)
-            # eligibility
-            for p in reg_ids:
-                if not people[p].comet_eligible:
-                    model.Add(x[p,d_idx,"CMD"] == 0)
-                    model.Add(x[p,d_idx,"CMN"] == 0)
+                if p not in comet_eligible:
+                    model.Add(x[p, d_idx, ShiftType.COMET_DAY] == 0)
+                    model.Add(x[p, d_idx, ShiftType.COMET_NIGHT] == 0)
         else:
+            # No CoMET shifts outside CoMET weeks
             for p in P:
-                model.Add(x[p,d_idx,"CMD"] == 0)
-                model.Add(x[p,d_idx,"CMN"] == 0)
+                model.Add(x[p, d_idx, ShiftType.COMET_DAY] == 0)
+                model.Add(x[p, d_idx, ShiftType.COMET_NIGHT] == 0)
 
-    # 5) No daytime assignment on the calendar day after a night (rest rule; approximates 46h rest elsewhere)
-    for p in P:
-        for d in D[:-1]:
-            model.Add(x[p,d,"N"] + sum(x[p,d+1,s] for s in ["SD","LD","CMD","CPD","TREG","TSHO","TPCCU","IND"]) <= 1)
+def add_training_constraints(model, x, people, days, config, P, D):
+    """Add training day constraints."""
+    
+    for d_idx, day in enumerate(days):
+        # Registrar training days
+        if day in config.registrar_training_days:
+            for p_idx, person in enumerate(people):
+                if person.grade == "Registrar":
+                    # Encourage but don't force registrar training attendance
+                    # This will be handled in soft constraints
+                    pass
+        
+        # SHO training days
+        if day in config.sho_training_days:
+            for p_idx, person in enumerate(people):
+                if person.grade == "SHO":
+                    # Encourage but don't force SHO training attendance
+                    pass
+        
+        # Unit training days (all grades)
+        if day in config.unit_training_days:
+            # Encourage unit training attendance for all
+            pass
 
-        # 46h rest after any night block: enforce no assignment for two days after any night
-        for d in D[:-2]:
-            model.Add(x[p,d,"N"] + sum(x[p,d+1,s] for s in shift_codes if s != "OFF") + sum(x[p,d+2,s] for s in shift_codes if s != "OFF") <= 1)
+def add_coverage_constraints(model, x, locum_vars, days, config, P, D, reg_ids, sho_ids):
+    """Add daily coverage requirements."""
+    
+    for d_idx, day in enumerate(days):
+        is_weekend = day.weekday() >= 5
+        is_bank_holiday = day in config.bank_holidays
+        is_weekend_or_holiday = is_weekend or is_bank_holiday
+        
+        # DAILY REQUIREMENTS (every day)
+        
+        # Exactly 1 Long Day Registrar
+        model.Add(sum(x[p, d_idx, ShiftType.LONG_DAY_REG] for p in reg_ids) + 
+                 locum_vars["long_day_reg"][d_idx] == 1)
+        
+        # Exactly 1 Long Day SHO  
+        model.Add(sum(x[p, d_idx, ShiftType.LONG_DAY_SHO] for p in sho_ids) + 
+                 locum_vars["long_day_sho"][d_idx] == 1)
+        
+        # Exactly 1 Night Registrar
+        model.Add(sum(x[p, d_idx, ShiftType.NIGHT_REG] for p in reg_ids) + 
+                 locum_vars["night_reg"][d_idx] == 1)
+        
+        # Exactly 1 Night SHO
+        model.Add(sum(x[p, d_idx, ShiftType.NIGHT_SHO] for p in sho_ids) + 
+                 locum_vars["night_sho"][d_idx] == 1)
+        
+        # CoMET REQUIREMENTS (CoMET weeks only)
+        is_comet_week = any(monday <= day <= monday + dt.timedelta(days=6) 
+                           for monday in config.comet_on_weeks)
+        
+        if is_comet_week:
+            # Exactly 1 CoMET Day Registrar
+            model.Add(sum(x[p, d_idx, ShiftType.COMET_DAY] for p in reg_ids) + 
+                     locum_vars["comet_day"][d_idx] == 1)
+            
+            # Exactly 1 CoMET Night Registrar  
+            model.Add(sum(x[p, d_idx, ShiftType.COMET_NIGHT] for p in reg_ids) + 
+                     locum_vars["comet_night"][d_idx] == 1)
+        
+        # SHORT DAY REQUIREMENTS (weekdays only)
+        if not is_weekend_or_holiday:
+            # Minimum 1, target more short day staff
+            model.Add(sum(x[p, d_idx, ShiftType.SHORT_DAY] for p in P) + 
+                     locum_vars["short_day"][d_idx] >= config.min_weekday_day_clinicians - 2)  # -2 for the LD staff
 
-    # 6) Max 72 hours in any rolling 7-day window
-    shift_hours = {"SD":9,"LD":13,"N":12,"CMD":12,"CMN":12,"CPD":9,"TREG":9,"TSHO":9,"TPCCU":9,"IND":9}
-    for p in P:
-        for start in range(len(D)-6):
-            expr = []
-            for d in range(start, start+7):
-                expr += [x[p,d,s]*shift_hours[s] for s in shift_codes if s in shift_hours]
-            model.Add(sum(expr) <= 72)
-
-    # 7) Max 1 assignment per night/day combination already ensures 11h rest and max shift length defined by catalog
-
-    # 8) Prevent teaching for those on nights same 24h (covered by rule 5)
-
-    return x, {
-        "loc_ld_reg":loc_ld_reg, "loc_ld_sho":loc_ld_sho, "loc_sd_any":loc_sd_any,
-        "loc_n_reg":loc_n_reg, "loc_n_sho":loc_n_sho, "loc_cmd":loc_cmd, "loc_cmn":loc_cmn
-    }, days, people
-
-def soft_objective(problem: ProblemInput, model: cp_model.CpModel, x, locums, days, people):
-    # Minimize locums heavily + gentle push towards weekday day target counts
+def soft_objective(problem: ProblemInput, model: cp_model.CpModel, x, locum_vars, days, people, breach_vars=None):
+    """Add soft constraints and optimization objective following prioritisation order."""
+    
     terms = []
-    W = problem.weights
-
-    # Locum penalties
-    for k in ["loc_ld_reg","loc_ld_sho","loc_sd_any","loc_n_reg","loc_n_sho","loc_cmd","loc_cmn"]:
-        for v in locums[k]:
-            terms.append(W.locum * v)
-
-    # Weekday day target (aim 4 clinicians on weekdays; supernumerary don't count)
+    weights = problem.weights
+    P = range(len(people))
+    
+    # PRIORITY 1: Cover CoMET days and nights (HIGHEST WEIGHT: 10000)
+    for locum_type in ["comet_day", "comet_night"]:
+        if locum_type in locum_vars:
+            for var in locum_vars[locum_type]:
+                terms.append(10000 * var)  # Massive penalty for CoMET locums
+    
+    # PRIORITY 2: Cover night shifts (VERY HIGH WEIGHT: 5000)
+    for locum_type in ["night_reg", "night_sho"]:
+        if locum_type in locum_vars:
+            for var in locum_vars[locum_type]:
+                terms.append(5000 * var)  # Very high penalty for night locums
+    
+    # PRIORITY 3: Cover weekends (HIGH WEIGHT: 2500)
+    # Weekend coverage implicit in daily requirements, add fairness bonus
+    
+    # PRIORITY 4: Cover Bank Holiday days (MEDIUM WEIGHT: 1200)
+    # Implicit in daily requirements
+    
+    # PRIORITY 5: Cover Weekday Long days (MEDIUM WEIGHT: 1000)
+    for locum_type in ["long_day_reg", "long_day_sho"]:
+        if locum_type in locum_vars:
+            for var in locum_vars[locum_type]:
+                terms.append(1000 * var)  # Medium penalty for long day locums
+    
+    # PRIORITY 6: Cover weekdays with 2 doctors per day (WEIGHT: 500)
+    for locum_type in ["short_day"]:
+        if locum_type in locum_vars:
+            for var in locum_vars[locum_type]:
+                terms.append(500 * var)  # Lower penalty for short day locums
+    
+    # PRIORITY 7 & 8: Training assignments and hours balancing (LOWEST WEIGHT: 100)
+    # These are handled by firm constraints and preferences
+    
+    # Weekday staffing targets (Priority 6)
     for d_idx, day in enumerate(days):
         if day.weekday() < 5 and day not in problem.config.bank_holidays:
-            # count = LD(2 people) + SD(any count) excluding supernumerary; LDs are exactly 2 already by grade requirement
-            # encourage SD count to reach ideal (min 1 is hard)
-            # we can't use absolute value easily; approximate with hinge loss from ideal
+            # Count total day staff (LD + SD)
+            total_day_staff = (
+                sum(x[p, d_idx, ShiftType.LONG_DAY_REG] for p in P) +
+                sum(x[p, d_idx, ShiftType.LONG_DAY_SHO] for p in P) +
+                sum(x[p, d_idx, ShiftType.SHORT_DAY] for p in P) +
+                sum(x[p, d_idx, ShiftType.COMET_DAY] for p in P)  # CoMET counts as day staff
+            )
+            
+            # Deviation from ideal staffing (2 doctors per weekday)
             ideal = problem.config.ideal_weekday_day_clinicians
-            # Decision: approximate penalty for deviation from ideal using extra slack ints
-            # Create per-day deviation variable
-            dev_pos = model.NewIntVar(0, 5, f"devpos_d{d_idx}")
-            dev_neg = model.NewIntVar(0, 5, f"devneg_d{d_idx}")
-            # sum SDs among non-supernumerary
-            sd_sum = sum(x[p,d_idx,"SD"] for p in range(len(people)) if people[p].grade != "Supernumerary")
-            # total clinicians = 2 (LD pair) + sd_sum
-            # enforce dev_pos - dev_neg = (2 + sd_sum) - ideal
-            model.Add(dev_pos - dev_neg == 2 + sd_sum - ideal)
-            terms.append(problem.weights.weekday_day_target_penalty * (dev_pos + dev_neg))
-
-    model.Minimize(sum(terms))
+            deviation_pos = model.NewIntVar(0, 10, f"dev_pos_d{d_idx}")
+            deviation_neg = model.NewIntVar(0, 10, f"dev_neg_d{d_idx}")
+            
+            model.Add(deviation_pos - deviation_neg == total_day_staff - ideal)
+            terms.append(100 * (deviation_pos + deviation_neg))  # Lower weight
+    
+    # Breach penalties (Firm constraints)
+    if breach_vars:
+        for breach_type, var_list in breach_vars.items():
+            weight = getattr(weights, f"{breach_type}_violation", 200)
+            for var in var_list:
+                terms.append(weight * var)
+    
+    # Basic fairness approximation (Priority 8 - lowest)
+    # Minimize variance in total shifts assigned
+    
+    # Basic fairness approximation (more sophisticated fairness in hard/firm constraints)
+    # Minimize variance in total shifts assigned
+    if len(people) > 1:
+        working_shifts = [s for s in ShiftType if SHIFT_DEFINITIONS[s]["hours"] > 0]
+        person_totals = []
+        
+        for p in P:
+            total = sum(x[p, d, s] for d in range(len(days)) for s in working_shifts)
+            person_totals.append(total)
+        
+        # Approximate fairness by minimizing max-min difference
+        max_shifts = model.NewIntVar(0, len(days) * 2, "max_shifts")
+        min_shifts = model.NewIntVar(0, len(days) * 2, "min_shifts")
+        
+        for total in person_totals:
+            model.Add(total <= max_shifts)
+            model.Add(total >= min_shifts)
+        
+        terms.append(weights.fairness_variance_15pct * (max_shifts - min_shifts))
+    
+    if terms:
+        model.Minimize(sum(terms))
+    else:
+        # Fallback: minimize total assignments (shouldn't happen)
+        model.Minimize(sum(x[p,d,s] for p in P for d in range(len(days)) for s in ShiftType if s != ShiftType.OFF))

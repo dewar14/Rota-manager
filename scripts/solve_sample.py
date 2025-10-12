@@ -1,6 +1,10 @@
-import yaml, pandas as pd, datetime as dt
-from rostering.models import ProblemInput, Person, Config, Weights
-from rostering.solver import solve_roster
+import yaml, pandas as pd, datetime as dt, sys, os
+
+# Add the parent directory to the path so we can import rostering
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from rostering.models import ProblemInput, Person, Config, ConstraintWeights
+from rostering.sequential_solver import SequentialSolver
 
 with open("data/sample_config.yml") as f:
     cfg = yaml.safe_load(f)
@@ -33,6 +37,34 @@ for _,r in df.iterrows():
         start_date=sd
     ))
 
-problem = ProblemInput(people=people, config=config)
-res = solve_roster(problem)
-print(res.message, "| locum slots:", res.summary.get("locum_slots"))
+problem = ProblemInput(people=people, config=config, weights=ConstraintWeights())
+
+# Test new sequential solver with cumulative fairness
+print(f"Solving roster for {len(people)} people over {(config.end_date - config.start_date).days + 1} days...")
+
+solver = SequentialSolver(problem, historical_comet_counts=None)
+result = solver.solve_stage("comet", timeout_seconds=60)
+
+if result.success:
+    print(f"COMET stage: {result.message}")
+    
+    # Count assignments by person
+    comet_assignments = {}
+    for person in people:
+        if person.comet_eligible:
+            comet_assignments[person.name] = {"cmd": 0, "cmn": 0}
+    
+    for day_str, assignments in result.partial_roster.items():
+        for person_id, shift in assignments.items():
+            person_name = next((p.name for p in people if p.id == person_id), person_id)
+            if shift == 'CMD':
+                comet_assignments[person_name]["cmd"] += 1
+            elif shift == 'CMN':
+                comet_assignments[person_name]["cmn"] += 1
+    
+    print("\nCOMET assignments with new fairness system:")
+    for name, counts in comet_assignments.items():
+        total = counts["cmd"] + counts["cmn"]
+        print(f"  {name}: {counts['cmd']} CMD + {counts['cmn']} CMN = {total} total")
+else:
+    print(f"COMET stage failed: {result.message}")

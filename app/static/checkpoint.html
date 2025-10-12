@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rota Manager - Checkpoint Solver</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .stage-progress {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+        }
+        .stage {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            margin: 0 5px;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .stage.pending {
+            background-color: #e9ecef;
+            color: #6c757d;
+        }
+        .stage.active {
+            background-color: #007bff;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+        .stage.completed {
+            background-color: #28a745;
+            color: white;
+        }
+        .stage.failed {
+            background-color: #dc3545;
+            color: white;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .log-container {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            margin-bottom: 20px;
+        }
+        .statistics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .checkpoint-controls {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .checkpoint-controls.show {
+            display: block;
+        }
+        .checkpoint-message {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #856404;
+        }
+        .settings {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .setting-group label {
+            min-width: 150px;
+            font-weight: bold;
+        }
+        .setting-group input, .setting-group select {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Rota Manager - Checkpoint Solver</h1>
+            <p>Sequential roster solving with admin review checkpoints</p>
+        </div>
+
+        <div class="stage-progress">
+            <div class="stage pending" id="stage-comet_nights">COMET Nights</div>
+            <div class="stage pending" id="stage-nights">Unit Nights</div>
+            <div class="stage pending" id="stage-weekend_holidays">Holiday Working</div>
+            <div class="stage pending" id="stage-comet_days">COMET Days</div>
+            <div class="stage pending" id="stage-weekday_long_days">Unit Long Days</div>
+            <div class="stage pending" id="stage-short_days">Short Days</div>
+        </div>
+
+        <div class="settings">
+            <h3>Settings</h3>
+            <div class="setting-group">
+                <label>Timeout per stage:</label>
+                <select id="timeout-select">
+                    <option value="300">5 minutes</option>
+                    <option value="600">10 minutes</option>
+                    <option value="1800" selected>30 minutes</option>
+                    <option value="3600">1 hour</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>Auto-continue:</label>
+                <input type="checkbox" id="auto-continue" checked>
+                <span>Skip manual checkpoints</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="start-solve">🚀 Start Full Solve</button>
+            <button class="btn btn-success" id="solve-single" disabled>▶️ Solve Current Stage</button>
+            <button class="btn btn-warning" id="pause-solve" disabled>⏸️ Pause</button>
+            <button class="btn btn-danger" id="reset-solve">🔄 Reset</button>
+            <button class="btn btn-primary" id="load-sample">📄 Load Sample Data</button>
+        </div>
+
+        <div class="checkpoint-controls" id="checkpoint-controls">
+            <div class="checkpoint-message" id="checkpoint-message"></div>
+            <div class="controls">
+                <button class="btn btn-success" id="continue-solve">✅ Continue to Next Stage</button>
+                <button class="btn btn-warning" id="pause-at-checkpoint">⏸️ Pause Here</button>
+                <button class="btn btn-danger" id="stop-solve">🛑 Stop Solving</button>
+            </div>
+        </div>
+
+        <div class="statistics" id="statistics">
+            <div class="stat-card">
+                <div class="stat-value" id="total-shifts">0</div>
+                <div class="stat-label">Total Shifts Assigned</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="days-covered">0</div>
+                <div class="stat-label">Days Covered</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="current-stage">-</div>
+                <div class="stat-label">Current Stage</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="solve-status">Ready</div>
+                <div class="stat-label">Status</div>
+            </div>
+        </div>
+
+        <div class="log-container" id="log-container">
+            <div>Rota Manager Checkpoint Solver v1.0</div>
+            <div>Ready to solve roster with transparent stage progression...</div>
+            <div>================================================================================</div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentStage = null;
+        let isRunning = false;
+        let currentSolver = null;
+        let stages = ['comet_nights', 'nights', 'weekend_holidays', 'comet_days', 'weekday_long_days', 'short_days'];
+        let stageNames = {
+            'comet_nights': 'COMET Nights',
+            'nights': 'Unit Nights', 
+            'weekend_holidays': 'Holiday Working',
+            'comet_days': 'COMET Days',
+            'weekday_long_days': 'Unit Long Days',
+            'short_days': 'Short Days'
+        };
+        
+        // DOM elements
+        const logContainer = document.getElementById('log-container');
+        const checkpointControls = document.getElementById('checkpoint-controls');
+        const checkpointMessage = document.getElementById('checkpoint-message');
+        const startBtn = document.getElementById('start-solve');
+        const singleBtn = document.getElementById('solve-single');
+        const pauseBtn = document.getElementById('pause-solve');
+        const resetBtn = document.getElementById('reset-solve');
+        const loadBtn = document.getElementById('load-sample');
+        const continueBtn = document.getElementById('continue-solve');
+        const pauseAtBtn = document.getElementById('pause-at-checkpoint');
+        const stopBtn = document.getElementById('stop-solve');
+        const timeoutSelect = document.getElementById('timeout-select');
+        const autoContinue = document.getElementById('auto-continue');
+
+        // Utility functions
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.createElement('div');
+            logDiv.style.color = type === 'error' ? '#ff4444' : 
+                               type === 'success' ? '#44ff44' : 
+                               type === 'warning' ? '#ffff44' : '#00ff00';
+            logDiv.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(logDiv);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function updateStageProgress(stage, status) {
+            stages.forEach(s => {
+                const el = document.getElementById(`stage-${s}`);
+                el.className = 'stage pending';
+            });
+
+            if (stage) {
+                const stageIndex = stages.indexOf(stage);
+                for (let i = 0; i < stageIndex; i++) {
+                    document.getElementById(`stage-${stages[i]}`).className = 'stage completed';
+                }
+                
+                const currentEl = document.getElementById(`stage-${stage}`);
+                currentEl.className = `stage ${status}`;
+            }
+        }
+
+        function updateStatistics(stats) {
+            if (stats) {
+                document.getElementById('total-shifts').textContent = stats.total_assigned || 0;
+                document.getElementById('days-covered').textContent = stats.days_covered || 0;
+            }
+            document.getElementById('current-stage').textContent = currentStage ? stageNames[currentStage] : '-';
+        }
+
+        function updateControls() {
+            startBtn.disabled = isRunning;
+            singleBtn.disabled = isRunning || !currentStage;
+            pauseBtn.disabled = !isRunning;
+            resetBtn.disabled = isRunning;
+            loadBtn.disabled = isRunning;
+        }
+
+        // API functions
+        async function loadSampleData() {
+            try {
+                log('Loading sample data...');
+                const response = await fetch('/solve_sequential', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        stage: 'comet_nights',
+                        timeout: parseInt(timeoutSelect.value),
+                        problem: {
+                            // This would normally load from a file or form
+                            // For now, using default sample data
+                        }
+                    })
+                });
+                
+                if (response.ok) {
+                    log('Sample data loaded successfully', 'success');
+                    currentStage = 'comet_nights';
+                    updateStageProgress(currentStage, 'pending');
+                    updateControls();
+                } else {
+                    log('Failed to load sample data', 'error');
+                }
+            } catch (error) {
+                log(`Error loading sample data: ${error.message}`, 'error');
+            }
+        }
+
+        async function startFullSolve() {
+            try {
+                isRunning = true;
+                currentStage = 'comet_nights';
+                updateControls();
+                updateStageProgress(currentStage, 'active');
+                
+                log('Starting full sequential solve with checkpoints...', 'success');
+                document.getElementById('solve-status').textContent = 'Running';
+                
+                const response = await fetch('/solve_with_checkpoints', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        timeout_per_stage: parseInt(timeoutSelect.value),
+                        auto_continue: autoContinue.checked,
+                        problem: getSampleProblem()
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    log(`Solve completed: ${result.message}`, 'success');
+                    updateStageProgress(result.stage, 'completed');
+                    document.getElementById('solve-status').textContent = 'Completed';
+                } else {
+                    log(`Solve failed: ${result.message}`, 'error');
+                    updateStageProgress(result.stage, 'failed');
+                    document.getElementById('solve-status').textContent = 'Failed';
+                }
+                
+                updateStatistics(result.stats);
+                
+            } catch (error) {
+                log(`Error during solve: ${error.message}`, 'error');
+                document.getElementById('solve-status').textContent = 'Error';
+            } finally {
+                isRunning = false;
+                updateControls();
+            }
+        }
+
+        async function solveSingleStage() {
+            if (!currentStage) return;
+            
+            try {
+                isRunning = true;
+                updateControls();
+                updateStageProgress(currentStage, 'active');
+                
+                log(`Solving stage: ${stageNames[currentStage]}...`);
+                
+                const response = await fetch('/solve_sequential', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        stage: currentStage,
+                        timeout: parseInt(timeoutSelect.value),
+                        problem: getSampleProblem()
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    log(`Stage ${stageNames[currentStage]} completed: ${result.message}`, 'success');
+                    updateStageProgress(currentStage, 'completed');
+                    
+                    if (result.next_stage) {
+                        currentStage = result.next_stage;
+                        updateStageProgress(currentStage, 'pending');
+                        showCheckpoint(`Stage ${stageNames[currentStage]} ready. Continue?`);
+                    } else {
+                        log('All stages completed!', 'success');
+                        document.getElementById('solve-status').textContent = 'Completed';
+                    }
+                } else {
+                    log(`Stage ${stageNames[currentStage]} failed: ${result.message}`, 'error');
+                    updateStageProgress(currentStage, 'failed');
+                }
+                
+                updateStatistics(result.stats);
+                
+            } catch (error) {
+                log(`Error solving stage: ${error.message}`, 'error');
+                updateStageProgress(currentStage, 'failed');
+            } finally {
+                isRunning = false;
+                updateControls();
+            }
+        }
+
+        function showCheckpoint(message) {
+            checkpointMessage.textContent = message;
+            checkpointControls.classList.add('show');
+        }
+
+        function hideCheckpoint() {
+            checkpointControls.classList.remove('show');
+        }
+
+        function resetSolver() {
+            isRunning = false;
+            currentStage = null;
+            updateStageProgress(null, 'pending');
+            updateControls();
+            hideCheckpoint();
+            log('Solver reset', 'warning');
+            document.getElementById('solve-status').textContent = 'Ready';
+            updateStatistics(null);
+            
+            // Reset progress indicators
+            stages.forEach(s => {
+                document.getElementById(`stage-${s}`).className = 'stage pending';
+            });
+        }
+
+        function getSampleProblem() {
+            // This would normally come from a form or file upload
+            // For demo purposes, returning a basic structure
+            return {
+                config: {
+                    start_date: "2025-02-10",
+                    end_date: "2025-02-23",
+                    comet_on_weeks: ["2025-02-10"]
+                },
+                people: [
+                    { id: "reg1", name: "Mei Yi Goh", grade: "Registrar", wte: 0.8, comet_eligible: true },
+                    { id: "reg2", name: "David White", grade: "Registrar", wte: 0.8, comet_eligible: true }
+                ]
+            };
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', startFullSolve);
+        singleBtn.addEventListener('click', solveSingleStage);
+        resetBtn.addEventListener('click', resetSolver);
+        loadBtn.addEventListener('click', loadSampleData);
+        
+        continueBtn.addEventListener('click', () => {
+            hideCheckpoint();
+            solveSingleStage();
+        });
+        
+        pauseAtBtn.addEventListener('click', () => {
+            hideCheckpoint();
+            log('Paused at checkpoint', 'warning');
+        });
+        
+        stopBtn.addEventListener('click', () => {
+            hideCheckpoint();
+            resetSolver();
+        });
+
+        // Initialize
+        updateControls();
+        log('Checkpoint solver UI initialized', 'success');
+        log('Click "Load Sample Data" or "Start Full Solve" to begin');
+    </script>
+</body>
+</html>

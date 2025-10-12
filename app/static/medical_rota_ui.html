@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Rota Manager - 6 Month Planning</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            background: #34495e;
+            color: white;
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #dde4ef;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+        }
+        
+        .btn-success:hover {
+            background: #219a52;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #dde4ef;
+            margin-bottom: 1.5rem;
+        }
+        
+        .tab {
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            border-bottom-color: #3498db;
+            color: #3498db;
+            font-weight: 600;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .status-pending { background: #f39c12; }
+        .status-running { background: #3498db; }
+        .status-complete { background: #27ae60; }
+        .status-error { background: #e74c3c; }
+        
+        .doctor-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+        
+        .doctor-card {
+            border: 1px solid #dde4ef;
+            border-radius: 4px;
+            padding: 1rem;
+            background: #fafbfc;
+        }
+        
+        .doctor-card h4 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+        
+        .doctor-meta {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+            margin-bottom: 0.5rem;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .date-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #dde4ef;
+            border-radius: 4px;
+            padding: 0.5rem;
+            background: #fafbfc;
+        }
+        
+        .date-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .date-item:last-child {
+            border-bottom: none;
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        
+        .alert-info {
+            background: #d6eaf8;
+            border: 1px solid #aed6f1;
+            color: #1b4f72;
+        }
+        
+        .alert-warning {
+            background: #fdeaa7;
+            border: 1px solid #f7dc6f;
+            color: #7d6608;
+        }
+        
+        .alert-error {
+            background: #fadbd8;
+            border: 1px solid #f1948a;
+            color: #78281f;
+        }
+        
+        .rota-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            margin-top: 1rem;
+        }
+        
+        .rota-table th, .rota-table td {
+            border: 1px solid #dde4ef;
+            padding: 0.5rem;
+            text-align: center;
+        }
+        
+        .rota-table th {
+            background: #34495e;
+            color: white;
+            font-weight: 600;
+        }
+        
+        /* Enhanced Shift color coding for better readability */
+        .shift-CMN { background: #8B0000 !important; color: white; font-weight: bold; }  /* COMET Night - Dark Red */
+        .shift-CMD { background: #4B0082 !important; color: white; font-weight: bold; }  /* COMET Day - Indigo */
+        .shift-N_REG { background: #FF6B6B !important; color: white; }  /* Night Registrar - Light Red */
+        .shift-N_SHO { background: #FF8E8E !important; color: #8B0000; }  /* Night SHO - Lighter Red */
+        .shift-LD_REG { background: #32CD32 !important; color: white; }  /* Long Day Registrar - Lime Green */
+        .shift-LD_SHO { background: #90EE90 !important; color: #006400; }  /* Long Day SHO - Light Green */
+        .shift-SD { background: #FFD700 !important; color: #B8860B; }  /* Short Day - Gold */
+        .shift-CPD { background: #FF8C00 !important; color: white; }  /* CPD - Dark Orange */
+        .shift-TRAINING { background: #87CEEB !important; color: #191970; }  /* Training - Sky Blue */
+        .shift-INDUCTION { background: #708090 !important; color: white; }  /* Induction - Slate Gray */
+        .shift-LEAVE { background: #ADD8E6 !important; color: #000080; }  /* Leave - Light Blue */
+        .shift-STUDY { background: #98FB98 !important; color: #006400; }  /* Study - Pale Green */
+        .shift-LTFT { background: #F5F5F5 !important; color: #666; border: 1px dashed #999; }  /* LTFT - Light Gray */
+        .shift-OFF { background: #FFFFFF !important; color: #999; }  /* Off - White */
+        
+        /* Weekend highlighting */
+        .weekend-row { background: #F8F9FA !important; }
+        
+        /* Bank holiday highlighting */
+        .bank-holiday-row { background: #FFF3CD !important; }
+        
+        /* Shift legend */
+        .shift-legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.5rem;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 15px;
+            margin-right: 0.5rem;
+            border-radius: 2px;
+            border: 1px solid #ddd;
+        }
+        
+        .weekend { background: #f8f9fa !important; }
+        .bank-holiday { background: #fff3cd !important; }
+        .school-holiday { background: #e2e3e5 !important; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏥 Medical Rota Manager</h1>
+        <p>Critical Care Department - 6 Month Roster Planning System</p>
+    </div>
+    
+    <div class="container">
+        <!-- Configuration Tab System -->
+        <div class="card">
+            <div class="card-header">
+                <div class="tabs">
+                    <div class="tab active" onclick="showTab('setup')">📅 Rota Setup</div>
+                    <div class="tab" onclick="showTab('doctors')">👥 Doctor Management</div>
+                    <div class="tab" onclick="showTab('training')">📚 Training Days</div>
+                    <div class="tab" onclick="showTab('solve')">🔧 Generate Rota</div>
+                    <div class="tab" onclick="showTab('results')">📊 Results & Export</div>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <!-- Setup Tab -->
+                <div id="setup" class="tab-content active">
+                    <div class="alert alert-info">
+                        <strong>6-Month Rota Period:</strong> Configure the 26-week roster timeline, holidays, and COMET schedule.
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Start Date (Monday):</label>
+                            <input type="date" id="start-date" value="2026-02-04">
+                        </div>
+                        <div class="form-group">
+                            <label>End Date (Sunday):</label>
+                            <input type="date" id="end-date" value="2026-08-02" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Bank Holidays:</label>
+                            <textarea id="bank-holidays" rows="4">2026-04-03 (Good Friday)
+2026-04-06 (Easter Monday)
+2026-05-04 (Early May Bank Holiday)
+2026-05-25 (Spring Bank Holiday)
+2026-08-31 (Summer Bank Holiday)</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>School Holidays (Nottinghamshire):</label>
+                            <textarea id="school-holidays" rows="4" placeholder="2025-02-17 to 2025-02-21 (Feb Half Term)&#10;2025-04-14 to 2025-04-25 (Easter)"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>COMET Week Pattern (Alternate weeks starting with):</label>
+                        <input type="date" id="comet-start" value="2026-02-09">
+                        <small style="color: #7f8c8d; display: block; margin-top: 0.25rem;">
+                            COMET weeks will be generated automatically every 2 weeks from this date
+                        </small>
+                        <div id="comet-weeks-preview" style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.8rem;">
+                            <!-- COMET weeks preview will be shown here -->
+                        </div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Min Weekly Hours (× WTE):</label>
+                            <input type="number" id="min-hours" value="42" min="35" max="48">
+                        </div>
+                        <div class="form-group">
+                            <label>Max Weekly Hours (× WTE):</label>
+                            <input type="number" id="max-hours" value="47" min="35" max="48">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Doctors Tab -->
+                <div id="doctors" class="tab-content">
+                    <div class="alert alert-info">
+                        <strong>Doctor Configuration:</strong> Manage staff details, WTE status, and COMET eligibility.
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn" onclick="addDoctor()">➕ Add Doctor</button>
+                        <button class="btn" onclick="importDoctorsCSV()">📄 Import from CSV</button>
+                    </div>
+                    
+                    <div id="doctor-list" class="doctor-list">
+                        <!-- Doctors will be populated here -->
+                    </div>
+                </div>
+                
+                <!-- Training Tab -->
+                <div id="training" class="tab-content">
+                    <div class="alert alert-info">
+                        <strong>Training Schedule:</strong> Configure regional and unit training days for the 6-month period.
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Registrar Training Days:</label>
+                            <div id="reg-training-dates" class="date-list">
+                                <!-- Training dates will be populated here -->
+                            </div>
+                            <button class="btn" style="margin-top: 0.5rem;" onclick="addTrainingDate('registrar')">Add Date</button>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>SHO Training Days:</label>
+                            <div id="sho-training-dates" class="date-list">
+                                <!-- Training dates will be populated here -->
+                            </div>
+                            <button class="btn" style="margin-top: 0.5rem;" onclick="addTrainingDate('sho')">Add Date</button>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Unit Training Days:</label>
+                            <div id="unit-training-dates" class="date-list">
+                                <!-- Training dates will be populated here -->
+                            </div>
+                            <button class="btn" style="margin-top: 0.5rem;" onclick="addTrainingDate('unit')">Add Date</button>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Induction Days:</label>
+                            <div id="induction-dates" class="date-list">
+                                <!-- Induction dates will be populated here -->
+                            </div>
+                            <button class="btn" style="margin-top: 0.5rem;" onclick="addTrainingDate('induction')">Add Date</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Solve Tab -->
+                <div id="solve" class="tab-content">
+                    <div class="alert alert-warning">
+                        <strong>Generate Rota:</strong> This process may take 10-30 minutes for a 6-month period. Progress will be shown below.
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Solve Strategy:</label>
+                        <select id="solve-strategy">
+                            <option value="staged">Staged Sequential (Recommended)</option>
+                            <option value="full">Full Optimization</option>
+                            <option value="partial">Partial/Best Effort</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Timeout per Stage (minutes):</label>
+                        <input type="number" id="timeout" value="60" min="5" max="180">
+                        <small style="color: #7f8c8d; display: block; margin-top: 0.25rem;">
+                            Increased timeout for 26-week roster generation. Each stage may take several minutes.
+                        </small>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn btn-success" id="btn-start-solve" onclick="startSolve()">🚀 Generate Rota</button>
+                        <button class="btn btn-danger" id="btn-stop-solve" onclick="stopSolve()" disabled>⏹️ Stop</button>
+                    </div>                    <div id="solve-progress" style="display: none;">
+                        <h4>Progress:</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div id="progress-text">Initializing...</div>
+                        
+                        <div id="stage-progress">
+                            <h5>Stage Progress:</h5>
+                            <div id="stage-list">
+                                <!-- Stage progress will be shown here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Results Tab -->
+                <div id="results" class="tab-content">
+                    <div class="alert alert-info">
+                        <strong>Rota Results:</strong> Review the generated roster, statistics, and export options.
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn" onclick="exportExcel()">📊 Export Excel</button>
+                        <button class="btn" onclick="exportPDF()">📄 Export PDF</button>
+                        <button class="btn" onclick="showStatistics()">📈 View Statistics</button>
+                    </div>
+                    
+                    <div id="rota-display">
+                        <!-- Rota table will be displayed here -->
+                    </div>
+                    
+                    <div id="statistics-panel" style="display: none;">
+                        <!-- Statistics will be shown here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Tab management
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+        
+        // Doctor management
+        function addDoctor() {
+            const doctorList = document.getElementById('doctor-list');
+            const doctorId = 'doctor-' + Date.now();
+            
+            const doctorCard = document.createElement('div');
+            doctorCard.className = 'doctor-card';
+            doctorCard.innerHTML = `
+                <h4>New Doctor</h4>
+                <div class="form-group">
+                    <label>Name:</label>
+                    <input type="text" placeholder="Enter name">
+                </div>
+                <div class="form-group">
+                    <label>Grade:</label>
+                    <select name="grade">
+                        <option value="SHO">SHO</option>
+                        <option value="Registrar">Registrar</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>WTE:</label>
+                    <select name="wte">
+                        <option value="1.0">1.0 (Full Time)</option>
+                        <option value="0.8">0.8</option>
+                        <option value="0.6">0.6</option>
+                    </select>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="${doctorId}-comet" name="comet">
+                    <label for="${doctorId}-comet">COMET Eligible</label>
+                </div>
+                <div class="form-group">
+                    <label>Start Date:</label>
+                    <input type="date" name="startDate" placeholder="Leave blank if already started">
+                </div>
+                <div class="form-group">
+                    <label>Leave Allowance:</label>
+                    <select name="leaveDays">
+                        <option value="14">14 days</option>
+                        <option value="15" selected>15 days</option>
+                        <option value="17">17 days</option>
+                    </select>
+                </div>
+                <button class="btn btn-danger" style="margin-top: 0.5rem;" onclick="removeDoctor(this)">Remove</button>
+            `;
+            
+            doctorList.appendChild(doctorCard);
+        }
+        
+        function removeDoctor(button) {
+            button.closest('.doctor-card').remove();
+        }
+        
+        // Training date management
+        function addTrainingDate(type) {
+            const date = prompt('Enter training date (YYYY-MM-DD):');
+            if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+                const container = document.getElementById(`${type === 'registrar' ? 'reg' : type}-training-dates`);
+                const dateItem = document.createElement('div');
+                dateItem.className = 'date-item';
+                dateItem.innerHTML = `
+                    <span>${date}</span>
+                    <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;" onclick="removeTrainingDate(this)">Remove</button>
+                `;
+                container.appendChild(dateItem);
+            } else {
+                alert('Please enter a valid date in YYYY-MM-DD format');
+            }
+        }
+        
+        function removeTrainingDate(button) {
+            button.closest('.date-item').remove();
+        }
+        
+        // Sequential solving with checkpoints
+        let solveInProgress = false;
+        let currentStage = 0;
+        let currentRosterData = null;
+        let solvePayload = null;
+        
+        const stageOrder = [
+            { name: 'comet_nights', display: 'COMET Nights Assignment', api: 'comet_nights' },
+            { name: 'nights', display: 'Unit Nights Assignment', api: 'nights' },
+            { name: 'holiday', display: 'Holiday Working Assignment', api: 'holiday' },
+            { name: 'comet_days', display: 'COMET Days Assignment', api: 'comet_days' },
+            { name: 'long_days', display: 'Unit Long Days Assignment', api: 'long_days' },
+            { name: 'short_days', display: 'Short Days Assignment', api: 'short_days' }
+        ];
+
+        function startSolve() {
+            if (solveInProgress) return;
+            
+            // Reset sequential solving state
+            currentStage = 0;
+            currentRosterData = null;
+            
+            // Gather input data from UI
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const cometStart = document.getElementById('comet-start').value;
+            const bankHolidays = document.getElementById('bank-holidays').value.split('\n').map(x => x.split(' ')[0]).filter(x => x);
+            
+            const doctors = Array.from(document.querySelectorAll('.doctor-card')).map(card => ({
+                name: card.querySelector('input[type="text"]').value,
+                grade: card.querySelector('select[name="grade"]').value,
+                wte: parseFloat(card.querySelector('select[name="wte"]').value),
+                comet_eligible: card.querySelector('input[name="comet"]').checked
+            }));
+            
+            const regTraining = Array.from(document.getElementById('reg-training-dates').querySelectorAll('.date-item span')).map(e => e.textContent);
+            const shoTraining = Array.from(document.getElementById('sho-training-dates').querySelectorAll('.date-item span')).map(e => e.textContent);
+            const unitTraining = Array.from(document.getElementById('unit-training-dates').querySelectorAll('.date-item span')).map(e => e.textContent);
+            const induction = Array.from(document.getElementById('induction-dates').querySelectorAll('.date-item span')).map(e => e.textContent);
+
+            // Generate all COMET weeks for the 26-week period
+            const cometWeeks = generateCometWeeks(cometStart, startDate, endDate);
+            console.log('Generated COMET weeks:', cometWeeks);
+
+            // Build payload for API (will be reused for all stages)
+            solvePayload = {
+                people: doctors.map((d, i) => ({
+                    id: 'dr' + (i+1),
+                    name: d.name,
+                    grade: d.grade,
+                    wte: d.wte,
+                    comet_eligible: d.comet_eligible
+                })),
+                config: {
+                    start_date: startDate,
+                    end_date: endDate,
+                    comet_on_weeks: cometWeeks,
+                    bank_holidays: bankHolidays,
+                    registrar_training_days: regTraining,
+                    sho_training_days: shoTraining,
+                    unit_training_days: unitTraining,
+                    induction_days: induction
+                },
+                timeout: parseInt(document.getElementById('timeout').value) * 60
+            };
+
+            // Calculate and log date information
+            const startDateObj = new Date(startDate);
+            const endDateObj = new Date(endDate);
+            const totalDays = Math.ceil((endDateObj - startDateObj) / (1000 * 60 * 60 * 24));
+            const totalWeeks = Math.ceil(totalDays / 7);
+            
+            console.log('Date Range Analysis:');
+            console.log('- Start Date:', startDate, '(' + startDateObj.toDateString() + ')');
+            console.log('- End Date:', endDate, '(' + endDateObj.toDateString() + ')');
+            console.log('- Total Days:', totalDays);
+            console.log('- Total Weeks:', totalWeeks);
+            console.log('- COMET Weeks Generated:', cometWeeks.length);
+            console.log('- COMET Weeks:', cometWeeks);
+            
+            console.log('Starting sequential solve with payload:', solvePayload);
+            
+            // Start with first stage
+            solveNextStage();
+        }
+        
+        function solveNextStage() {
+            if (currentStage >= stageOrder.length) {
+                // All stages complete
+                solveInProgress = false;
+                document.getElementById('solve-progress').style.display = 'none';
+                document.getElementById('btn-start-solve').disabled = false;
+                document.getElementById('btn-stop-solve').disabled = true;
+                showTab('results');
+                displayRotaResults(currentRosterData);
+                showStageComplete('🎉 All stages completed! Rota generation finished.');
+                return;
+            }
+            
+            const stage = stageOrder[currentStage];
+            solveInProgress = true;
+            document.getElementById('solve-progress').style.display = 'block';
+            document.getElementById('btn-start-solve').disabled = true;
+            document.getElementById('btn-stop-solve').disabled = false;
+            
+            // Update progress display
+            const progressPercent = ((currentStage) / stageOrder.length) * 100;
+            document.getElementById('progress-fill').style.width = progressPercent + '%';
+            document.getElementById('progress-text').textContent = 
+                `Stage ${currentStage + 1}/${stageOrder.length}: ${stage.display}`;
+            
+            // Build stage-specific payload
+            const stagePayload = {
+                ...solvePayload,
+                stage: stage.api
+            };
+
+            console.log(`Solving stage ${currentStage + 1}: ${stage.display}`);
+
+            // Call backend API for this stage
+            fetch('/solve_sequential', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(stagePayload)
+            })
+            .then(res => {
+                console.log('Response status:', res.status);
+                return res.json();
+            })
+            .then(data => {
+                console.log('Stage response:', data);
+                
+                // Check if solver timed out or hit constraints
+                if (!data.success) {
+                    console.warn(`Stage ${stage.display} failed:`, data.message);
+                }
+                
+                // Log detailed statistics
+                if (data.partial_roster) {
+                    const totalDays = Object.keys(data.partial_roster).length;
+                    const totalShifts = Object.values(data.partial_roster).reduce((total, dayShifts) => {
+                        return total + Object.values(dayShifts).filter(shift => shift && shift !== 'OFF').length;
+                    }, 0);
+                    console.log(`Stage ${stage.display} results: ${totalDays} days, ${totalShifts} shifts assigned`);
+                    
+                    // Check for constraint violations after each stage
+                    checkConstraintsAfterStage(data.partial_roster);
+                }
+                
+                currentRosterData = data;
+                
+                // Show stage results and ask for approval
+                showStageResults(stage, data);
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                solveInProgress = false;
+                document.getElementById('solve-progress').style.display = 'none';
+                document.getElementById('btn-start-solve').disabled = false;
+                document.getElementById('btn-stop-solve').disabled = true;
+                alert(`Error in stage ${stage.display}: ${err.message}`);
+            });
+        }
+        
+        function showStageResults(stage, data) {
+            solveInProgress = false;
+            document.getElementById('btn-start-solve').disabled = false;
+            document.getElementById('btn-stop-solve').disabled = true;
+            
+            // Show current results
+            showTab('results');
+            displayRotaResults(data);
+            
+            // Calculate detailed statistics
+            let statsMessage = '';
+            if (data.partial_roster) {
+                const totalDays = Object.keys(data.partial_roster).length;
+                const totalShifts = Object.values(data.partial_roster).reduce((total, dayShifts) => {
+                    return total + Object.values(dayShifts).filter(shift => shift && shift !== 'OFF').length;
+                }, 0);
+                
+                const expectedDays = Math.ceil((new Date(solvePayload.config.end_date) - new Date(solvePayload.config.start_date)) / (1000 * 60 * 60 * 24)) + 1;
+                const coveragePercent = Math.round((totalDays / expectedDays) * 100);
+                
+                statsMessage = `\n📊 Coverage: ${totalDays}/${expectedDays} days (${coveragePercent}%), ${totalShifts} shifts assigned`;
+                
+                if (coveragePercent < 100) {
+                    statsMessage += `\n⚠️ Partial coverage - may indicate constraint conflicts or timeout`;
+                }
+            }
+            
+            // Show checkpoint dialog
+            const message = data.success ? 
+                `✅ Stage "${stage.display}" completed successfully!\n\n${data.message}${statsMessage}\n\nReview the results in the table below.\n\nContinue to next stage?` :
+                `❌ Stage "${stage.display}" failed!\n\n${data.message}${statsMessage}\n\nWould you like to continue anyway?`;
+                
+            showStageComplete(message);
+        }
+        
+        function showStageComplete(message) {
+            // Create modal dialog for stage approval
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.7); z-index: 1000; display: flex; 
+                align-items: center; justify-content: center;
+            `;
+            
+            const dialog = document.createElement('div');
+            dialog.style.cssText = `
+                background: white; padding: 2rem; border-radius: 8px; 
+                max-width: 500px; margin: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            `;
+            
+            const isComplete = currentStage >= stageOrder.length - 1;
+            const nextStage = isComplete ? 'Complete' : stageOrder[currentStage + 1]?.display;
+            
+            dialog.innerHTML = `
+                <h3>Stage ${currentStage + 1}/${stageOrder.length} Checkpoint</h3>
+                <p style="margin: 1rem 0; white-space: pre-line;">${message}</p>
+                <div style="text-align: right; margin-top: 2rem;">
+                    ${!isComplete ? `
+                        <button onclick="continueToNextStage()" class="btn btn-success" style="margin-right: 1rem;">
+                            ✅ Continue to "${nextStage}"
+                        </button>
+                    ` : ''}
+                    <button onclick="closeStageDialog()" class="btn">
+                        ${isComplete ? '🎉 Finish' : '⏸️ Pause Here'}
+                    </button>
+                </div>
+            `;
+            
+            modal.appendChild(dialog);
+            document.body.appendChild(modal);
+            window.currentStageModal = modal;
+        }
+        
+        function continueToNextStage() {
+            closeStageDialog();
+            currentStage++;
+            setTimeout(solveNextStage, 500); // Small delay for UI
+        }
+        
+        function closeStageDialog() {
+            if (window.currentStageModal) {
+                document.body.removeChild(window.currentStageModal);
+                window.currentStageModal = null;
+            }
+        }
+        
+        function generateCometWeeks(cometStartDate, rosterStartDate, rosterEndDate) {
+            const cometWeeks = [];
+            const startDate = new Date(cometStartDate);
+            const endDate = new Date(rosterEndDate);
+            const rosterStart = new Date(rosterStartDate);
+            
+            // Ensure we start from a Monday (COMET weeks should start on Monday)
+            const currentDate = new Date(startDate);
+            while (currentDate.getDay() !== 1) { // 1 = Monday
+                currentDate.setDate(currentDate.getDate() - 1);
+            }
+            
+            // Generate COMET weeks every 2 weeks
+            while (currentDate <= endDate) {
+                // Only include weeks that overlap with the roster period
+                const weekEnd = new Date(currentDate);
+                weekEnd.setDate(weekEnd.getDate() + 6); // End of week (Sunday)
+                
+                if (weekEnd >= rosterStart && currentDate <= endDate) {
+                    cometWeeks.push(currentDate.toISOString().split('T')[0]);
+                }
+                
+                // Move to next COMET week (2 weeks later)
+                currentDate.setDate(currentDate.getDate() + 14);
+            }
+            
+            return cometWeeks;
+        }
+        
+        function checkConstraintsAfterStage(roster) {
+            // Call constraint checking API
+            fetch('/check_constraints', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.violations && data.violations.length > 0) {
+                    const criticalCount = data.violations.filter(v => v.severity === 'CRITICAL').length;
+                    const highCount = data.violations.filter(v => v.severity === 'HIGH').length;
+                    
+                    console.warn(`Constraint violations detected: ${criticalCount} critical, ${highCount} high`);
+                    
+                    // Log first few critical violations with dates
+                    data.violations.filter(v => v.severity === 'CRITICAL').slice(0, 5).forEach(v => {
+                        let violationText = `- CRITICAL: ${v.description}`;
+                        if (v.affected_shifts && v.affected_shifts.length > 0) {
+                            const dates = v.affected_shifts.map(([date, shift]) => {
+                                const d = new Date(date);
+                                return d.toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'});
+                            }).join(', ');
+                            violationText += ` (${dates})`;
+                        }
+                        console.warn(violationText);
+                    });
+                    
+                    // Also log a few high violations
+                    data.violations.filter(v => v.severity === 'HIGH').slice(0, 3).forEach(v => {
+                        let violationText = `- HIGH: ${v.description}`;
+                        if (v.affected_shifts && v.affected_shifts.length > 0) {
+                            const dates = v.affected_shifts.map(([date, shift]) => {
+                                const d = new Date(date);
+                                return d.toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'});
+                            }).join(', ');
+                            violationText += ` (${dates})`;
+                        }
+                        console.warn(violationText);
+                    });
+                }
+            })
+            .catch(err => {
+                console.log('Could not check constraints:', err.message);
+            });
+        }
+
+        function stopSolve() {
+            solveInProgress = false;
+            document.getElementById('btn-start-solve').disabled = false;
+            document.getElementById('btn-stop-solve').disabled = true;
+            document.getElementById('progress-text').textContent = 'Solve stopped by user';
+            
+            // Close any open stage dialogs
+            closeStageDialog();
+            
+            // Reset sequential state
+            currentStage = 0;
+            currentRosterData = null;
+            solvePayload = null;
+        }
+        
+        function displayRotaResults(data) {
+            const container = document.getElementById('rota-display');
+            container.innerHTML = '';
+            if (!data || !data.partial_roster) {
+                container.innerHTML = '<div class="alert alert-error">No roster generated. Please check input or try again.</div>';
+                return;
+            }
+            
+            // Build shift legend first
+            const legendHtml = `
+                <div class="shift-legend">
+                    <div class="legend-item"><div class="legend-color shift-CMN"></div>CMN - COMET Night</div>
+                    <div class="legend-item"><div class="legend-color shift-CMD"></div>CMD - COMET Day</div>
+                    <div class="legend-item"><div class="legend-color shift-N_REG"></div>N_REG - Night Registrar</div>
+                    <div class="legend-item"><div class="legend-color shift-N_SHO"></div>N_SHO - Night SHO</div>
+                    <div class="legend-item"><div class="legend-color shift-LD_REG"></div>LD_REG - Long Day Registrar</div>
+                    <div class="legend-item"><div class="legend-color shift-LD_SHO"></div>LD_SHO - Long Day SHO</div>
+                    <div class="legend-item"><div class="legend-color shift-SD"></div>SD - Short Day</div>
+                    <div class="legend-item"><div class="legend-color shift-CPD"></div>CPD - Continuing Education</div>
+                    <div class="legend-item"><div class="legend-color shift-TRAINING"></div>TRAINING - Training Day</div>
+                    <div class="legend-item"><div class="legend-color shift-INDUCTION"></div>INDUCTION - Induction</div>
+                    <div class="legend-item"><div class="legend-color shift-LEAVE"></div>LEAVE - Annual Leave</div>
+                    <div class="legend-item"><div class="legend-color shift-STUDY"></div>STUDY - Study Leave</div>
+                    <div class="legend-item"><div class="legend-color shift-LTFT"></div>LTFT - Less Than Full Time</div>
+                    <div class="legend-item"><div class="legend-color shift-OFF"></div>OFF - Day Off</div>
+                </div>
+            `;
+            
+            // Build table
+            const roster = data.partial_roster;
+            const dates = Object.keys(roster).sort();
+            if (dates.length === 0) {
+                container.innerHTML = '<div class="alert alert-error">No shifts assigned. Please check constraints.</div>';
+                return;
+            }
+            
+            // Get doctor names
+            const doctorNames = Array.from(new Set(
+                dates.flatMap(date => Object.keys(roster[date]))
+            )).sort();
+            
+            let html = legendHtml + '<table class="rota-table"><thead><tr><th>Date</th>';
+            doctorNames.forEach(name => html += `<th style="min-width: 80px;">${name.replace(/^dr\d+$/, 'Dr ' + name.slice(2))}</th>`);
+            html += '</tr></thead><tbody>';
+            
+            dates.forEach(date => {
+                const dateObj = new Date(date);
+                const dayOfWeek = dateObj.getDay();
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+                const isBankHoliday = checkIfBankHoliday(date);
+                
+                let rowClass = '';
+                if (isBankHoliday) rowClass = 'bank-holiday-row';
+                else if (isWeekend) rowClass = 'weekend-row';
+                
+                html += `<tr class="${rowClass}">`;
+                html += `<td style="font-weight: bold;">${formatDateForDisplay(date)}</td>`;
+                
+                doctorNames.forEach(name => {
+                    const shift = roster[date][name] || 'OFF';
+                    const shiftClass = `shift-${shift.replace(/[^A-Z_]/g, '')}`;
+                    html += `<td class="${shiftClass}">${shift}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            
+            // Add summary statistics
+            html += generateRotaSummary(roster, doctorNames);
+            
+            container.innerHTML = html;
+        }
+        
+        function formatDateForDisplay(dateStr) {
+            const date = new Date(dateStr);
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
+        }
+        
+        function checkIfBankHoliday(dateStr) {
+            const bankHolidays = document.getElementById('bank-holidays').value
+                .split('\n')
+                .map(line => line.split(' ')[0])
+                .filter(d => d);
+            return bankHolidays.includes(dateStr);
+        }
+        
+        function generateRotaSummary(roster, doctorNames) {
+            const shiftCounts = {};
+            const doctorShiftCounts = {};
+            
+            // Initialize counters
+            doctorNames.forEach(name => {
+                doctorShiftCounts[name] = {};
+            });
+            
+            // Count shifts
+            Object.keys(roster).forEach(date => {
+                Object.keys(roster[date]).forEach(doctor => {
+                    const shift = roster[date][doctor];
+                    if (shift && shift !== 'OFF') {
+                        shiftCounts[shift] = (shiftCounts[shift] || 0) + 1;
+                        doctorShiftCounts[doctor][shift] = (doctorShiftCounts[doctor][shift] || 0) + 1;
+                    }
+                });
+            });
+            
+            let summaryHtml = '<div style="margin-top: 2rem;"><h4>Roster Summary</h4>';
+            summaryHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem;">';
+            
+            // Overall shift counts
+            summaryHtml += '<div><h5>Total Shift Counts</h5><ul>';
+            Object.keys(shiftCounts).sort().forEach(shift => {
+                summaryHtml += `<li><span class="shift-${shift.replace(/[^A-Z_]/g, '')}" style="padding: 2px 6px; border-radius: 3px; margin-right: 8px;">${shift}</span>: ${shiftCounts[shift]}</li>`;
+            });
+            summaryHtml += '</ul></div>';
+            
+            // Enhanced Doctor workload summary with detailed breakdown
+            summaryHtml += '<div><h5>Doctor Workload Breakdown</h5>';
+            summaryHtml += '<table class="workload-table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+            summaryHtml += '<thead><tr style="background-color: #f0f0f0;">';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Doctor</th>';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: center;">WTE</th>';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: center;">COMET Nights</th>';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: center;">COMET Days</th>';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Unit Nights</th>';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Long Days</th>';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Short Days</th>';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Holidays</th>';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Avg Weekly Hours</th>';
+            summaryHtml += '<th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Total Shifts</th>';
+            summaryHtml += '</tr></thead><tbody>';
+            
+            const rosterDates = Object.keys(roster).sort();
+            const totalDays = rosterDates.length;
+            const totalWeeks = totalDays / 7;
+            
+            doctorNames.forEach(doctor => {
+                const counts = doctorShiftCounts[doctor];
+                const cometNights = (counts['CMN'] || 0);
+                const cometDays = (counts['CMD'] || 0);
+                const unitNights = (counts['N_REG'] || 0) + (counts['N_SHO'] || 0);
+                const longDays = (counts['LD_REG'] || 0) + (counts['LD_SHO'] || 0);
+                const shortDays = (counts['SD'] || 0);
+                const holidays = (counts['LEAVE'] || 0);
+                const totalShifts = Object.values(counts).reduce((a, b) => a + b, 0);
+                
+                // Calculate total hours (approximate)
+                const totalHours = (cometNights * 12) + (cometDays * 12) + (unitNights * 13) + (longDays * 13) + (shortDays * 9);
+                const avgWeeklyHours = totalWeeks > 0 ? (totalHours / totalWeeks).toFixed(1) : '0.0';
+                
+                // Get WTE from doctor data (approximation - would need actual data)
+                const wte = doctor.includes('Alexander') || doctor.includes('Sarah') ? '0.6' : 
+                           doctor.includes('Abdifatah') || doctor.includes('Mahmoud') ? '1.0' : '0.8';
+                
+                summaryHtml += '<tr>';
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px;"><strong>${doctor}</strong></td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${wte}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${cometNights}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${cometDays}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${unitNights}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${longDays}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${shortDays}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${holidays}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${avgWeeklyHours}h</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><strong>${totalShifts}</strong></td>`;
+                summaryHtml += '</tr>';
+            });
+            summaryHtml += '</tbody></table></div>';
+            
+            summaryHtml += '</div></div>';
+            return summaryHtml;
+        }
+        
+        // Export functions
+        function exportExcel() {
+            alert('Excel export functionality would be implemented here');
+        }
+        
+        function exportPDF() {
+            alert('PDF export functionality would be implemented here');
+        }
+        
+        function showStatistics() {
+            const panel = document.getElementById('statistics-panel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // Initialize with actual doctor data
+        document.addEventListener('DOMContentLoaded', function() {
+            // Real doctor data from your roster with complete details
+            const doctors = [
+                { name: 'Mei Yi Goh', grade: 'Registrar', wte: '0.8', comet: true, startDate: '2026-04-02', leaveDays: 15 },
+                { name: 'Ryan White', grade: 'Registrar', wte: '0.8', comet: true, startDate: '2026-05-02', leaveDays: 15 },
+                { name: 'Nikki Francis', grade: 'Registrar', wte: '0.8', comet: true, startDate: '2026-06-02', leaveDays: 15 },
+                { name: 'Reuben Firth', grade: 'Registrar', wte: '0.8', comet: true, startDate: '2026-09-02', leaveDays: 15 },
+                { name: 'Alexander Yule', grade: 'Registrar', wte: '0.6', comet: false, startDate: null, leaveDays: 15 },
+                { name: 'Abdifatah Mohamud', grade: 'Registrar', wte: '1.0', comet: true, startDate: null, leaveDays: 15 },
+                { name: 'Hanin El Abbas', grade: 'Registrar', wte: '0.8', comet: true, startDate: null, leaveDays: 15 },
+                { name: 'Sarah Hallett', grade: 'Registrar', wte: '0.6', comet: false, startDate: null, leaveDays: 15 },
+                { name: 'Manan Kamboj', grade: 'Registrar', wte: '0.8', comet: true, startDate: null, leaveDays: 15 },
+                { name: 'Mahmoud', grade: 'Registrar', wte: '1.0', comet: true, startDate: null, leaveDays: 15 },
+                { name: 'Sarah Walker', grade: 'Registrar', wte: '0.6', comet: false, startDate: null, leaveDays: 15 }
+            ];
+            
+            doctors.forEach(doctor => {
+                addDoctor();
+                const cards = document.querySelectorAll('.doctor-card');
+                const lastCard = cards[cards.length - 1];
+                lastCard.querySelector('input[type="text"]').value = doctor.name;
+                lastCard.querySelector('h4').textContent = doctor.name;
+                lastCard.querySelector('select[name="grade"]').value = doctor.grade;
+                lastCard.querySelector('select[name="wte"]').value = doctor.wte;
+                lastCard.querySelector('input[name="comet"]').checked = doctor.comet;
+                if (doctor.startDate) {
+                    lastCard.querySelector('input[name="startDate"]').value = doctor.startDate;
+                }
+                lastCard.querySelector('select[name="leaveDays"]').value = doctor.leaveDays;
+            });
+            
+            // Pre-populate training dates from your spreadsheet data
+            const regTrainingDates = ['2026-02-17', '2026-03-18', '2026-04-22', '2026-05-20', '2026-06-30', '2026-07-22'];
+            const shoTrainingDates = ['2026-02-25', '2026-03-25', '2026-04-28', '2026-05-27', '2026-07-28'];
+            const unitTrainingDates = ['2026-02-12', '2026-02-26', '2026-03-11', '2026-05-08', '2026-07-09'];
+            const inductionDates = ['2026-04-02', '2026-05-02', '2026-06-02', '2026-09-02'];
+            
+            // Add registrar training dates
+            regTrainingDates.forEach(date => {
+                const container = document.getElementById('reg-training-dates');
+                const dateItem = document.createElement('div');
+                dateItem.className = 'date-item';
+                dateItem.innerHTML = `
+                    <span>${date}</span>
+                    <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;" onclick="removeTrainingDate(this)">Remove</button>
+                `;
+                container.appendChild(dateItem);
+            });
+            
+            // Add SHO training dates
+            shoTrainingDates.forEach(date => {
+                const container = document.getElementById('sho-training-dates');
+                const dateItem = document.createElement('div');
+                dateItem.className = 'date-item';
+                dateItem.innerHTML = `
+                    <span>${date}</span>
+                    <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;" onclick="removeTrainingDate(this)">Remove</button>
+                `;
+                container.appendChild(dateItem);
+            });
+            
+            // Add unit training dates
+            unitTrainingDates.forEach(date => {
+                const container = document.getElementById('unit-training-dates');
+                const dateItem = document.createElement('div');
+                dateItem.className = 'date-item';
+                dateItem.innerHTML = `
+                    <span>${date}</span>
+                    <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;" onclick="removeTrainingDate(this)">Remove</button>
+                `;
+                container.appendChild(dateItem);
+            });
+            
+            // Add induction dates
+            inductionDates.forEach(date => {
+                const container = document.getElementById('induction-dates');
+                const dateItem = document.createElement('div');
+                dateItem.className = 'date-item';
+                dateItem.innerHTML = `
+                    <span>${date}</span>
+                    <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;" onclick="removeTrainingDate(this)">Remove</button>
+                `;
+                container.appendChild(dateItem);
+            });
+
+                // Function to calculate UK bank holidays for a given year
+            function calculateBankHolidays(year) {
+                const holidays = [];
+                
+                // Fixed holidays
+                holidays.push(`${year}-01-01 (New Year's Day)`);
+                
+                // Easter calculation (simplified - works for most years)
+                const easter = calculateEaster(year);
+                const goodFriday = new Date(easter);
+                goodFriday.setDate(easter.getDate() - 2);
+                const easterMonday = new Date(easter);
+                easterMonday.setDate(easter.getDate() + 1);
+                
+                holidays.push(`${goodFriday.toISOString().split('T')[0]} (Good Friday)`);
+                holidays.push(`${easterMonday.toISOString().split('T')[0]} (Easter Monday)`);
+                
+                // May holidays (first Monday in May, last Monday in May)
+                const mayEarlyBH = getFirstMondayInMay(year);
+                const mayLateBH = getLastMondayInMay(year);
+                holidays.push(`${mayEarlyBH} (Early May Bank Holiday)`);
+                holidays.push(`${mayLateBH} (Spring Bank Holiday)`);
+                
+                // Last Monday in August
+                const augustBH = getLastMondayInAugust(year);
+                holidays.push(`${augustBH} (Summer Bank Holiday)`);
+                
+                // Christmas period
+                let christmasDay = `${year}-12-25`;
+                let boxingDay = `${year}-12-26`;
+                const christmas = new Date(year, 11, 25);
+                
+                if (christmas.getDay() === 6) { // Saturday
+                    christmasDay = `${year}-12-27 (Christmas Day Holiday)`;
+                    boxingDay = `${year}-12-28 (Boxing Day Holiday)`;
+                } else if (christmas.getDay() === 0) { // Sunday
+                    christmasDay = `${year}-12-26 (Christmas Day Holiday)`;
+                    boxingDay = `${year}-12-27 (Boxing Day Holiday)`;
+                } else {
+                    christmasDay += ' (Christmas Day)';
+                    boxingDay += ' (Boxing Day)';
+                }
+                
+                holidays.push(christmasDay);
+                holidays.push(boxingDay);
+                
+                return holidays;
+            }
+            
+            function calculateEaster(year) {
+                // Simplified Easter calculation
+                const a = year % 19;
+                const b = Math.floor(year / 100);
+                const c = year % 100;
+                const d = Math.floor(b / 4);
+                const e = b % 4;
+                const f = Math.floor((b + 8) / 25);
+                const g = Math.floor((b - f + 1) / 3);
+                const h = (19 * a + b - d - g + 15) % 30;
+                const i = Math.floor(c / 4);
+                const k = c % 4;
+                const l = (32 + 2 * e + 2 * i - h - k) % 7;
+                const m = Math.floor((a + 11 * h + 22 * l) / 451);
+                const month = Math.floor((h + l - 7 * m + 114) / 31);
+                const day = ((h + l - 7 * m + 114) % 31) + 1;
+                return new Date(year, month - 1, day);
+            }
+            
+            function getFirstMondayInMay(year) {
+                const may1 = new Date(year, 4, 1);
+                const daysToAdd = (8 - may1.getDay()) % 7;
+                const firstMonday = new Date(year, 4, 1 + daysToAdd);
+                return firstMonday.toISOString().split('T')[0];
+            }
+            
+            function getLastMondayInMay(year) {
+                const may31 = new Date(year, 4, 31);
+                const daysToSubtract = (may31.getDay() + 6) % 7;
+                const lastMonday = new Date(year, 4, 31 - daysToSubtract);
+                return lastMonday.toISOString().split('T')[0];
+            }
+            
+            function getLastMondayInAugust(year) {
+                const aug31 = new Date(year, 7, 31);
+                const daysToSubtract = (aug31.getDay() + 6) % 7;
+                const lastMonday = new Date(year, 7, 31 - daysToSubtract);
+                return lastMonday.toISOString().split('T')[0];
+            }
+
+            // Auto-calculate end date and update bank holidays
+            function updateRotaPeriod() {
+                const startDate = new Date(document.getElementById('start-date').value);
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + (26 * 7) - 1); // 26 weeks - 1 day
+                document.getElementById('end-date').value = endDate.toISOString().split('T')[0];
+                
+                // Update bank holidays for the period
+                const startYear = startDate.getFullYear();
+                const endYear = endDate.getFullYear();
+                let allHolidays = [];
+                
+                for (let year = startYear; year <= endYear; year++) {
+                    allHolidays = allHolidays.concat(calculateBankHolidays(year));
+                }
+                
+                // Filter holidays that fall within the 6-month period
+                const relevantHolidays = allHolidays.filter(holiday => {
+                    const holidayDate = new Date(holiday.split(' ')[0]);
+                    return holidayDate >= startDate && holidayDate <= endDate;
+                });
+                
+                document.getElementById('bank-holidays').value = relevantHolidays.join('\n');
+                
+                // Update COMET weeks preview
+                updateCometWeeksPreview();
+            }
+            
+            function updateCometWeeksPreview() {
+                const startDate = document.getElementById('start-date').value;
+                const endDate = document.getElementById('end-date').value;
+                const cometStart = document.getElementById('comet-start').value;
+                
+                if (startDate && endDate && cometStart) {
+                    const cometWeeks = generateCometWeeks(cometStart, startDate, endDate);
+                    const preview = document.getElementById('comet-weeks-preview');
+                    
+                    if (cometWeeks.length > 0) {
+                        preview.innerHTML = `
+                            <strong>📅 ${cometWeeks.length} COMET weeks will be generated:</strong><br>
+                            ${cometWeeks.slice(0, 3).map(week => formatDateForDisplay(week)).join(', ')}
+                            ${cometWeeks.length > 3 ? ` ... and ${cometWeeks.length - 3} more` : ''}
+                        `;
+                    } else {
+                        preview.innerHTML = '⚠️ No COMET weeks in the selected period';
+                    }
+                }
+            }
+            
+            document.getElementById('start-date').addEventListener('change', updateRotaPeriod);
+            document.getElementById('comet-start').addEventListener('change', updateCometWeeksPreview);
+            
+            // Trigger initial calculation for default date
+            updateRotaPeriod();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+# Medical Rota Configuration - 6 Month Period
+# February 2025 - July 2025 (26 weeks)
+
+start_date: 2025-02-03  # Monday (start of week 1)
+end_date: 2025-08-03    # Sunday (end of week 26)
+
+# UK Bank Holidays (Feb-Aug 2025)
+bank_holidays:
+  - 2025-04-18  # Good Friday
+  - 2025-04-21  # Easter Monday  
+  - 2025-05-05  # Early May Bank Holiday
+  - 2025-05-26  # Spring Bank Holiday
+  - 2025-08-25  # Summer Bank Holiday
+
+# Nottinghamshire School Holidays 2025
+school_holidays:
+  # February Half Term
+  - 2025-02-17
+  - 2025-02-18
+  - 2025-02-19
+  - 2025-02-20
+  - 2025-02-21
+  # Easter Holidays  
+  - 2025-04-14
+  - 2025-04-15
+  - 2025-04-16
+  - 2025-04-17
+  - 2025-04-18
+  - 2025-04-21
+  - 2025-04-22
+  - 2025-04-23
+  - 2025-04-24
+  - 2025-04-25
+  # May Half Term
+  - 2025-05-26
+  - 2025-05-27
+  - 2025-05-28
+  - 2025-05-29
+  - 2025-05-30
+  # Summer Holidays (partial)
+  - 2025-07-21
+  - 2025-07-22
+  - 2025-07-23
+  - 2025-07-24
+  - 2025-07-25
+  - 2025-07-28
+  - 2025-07-29
+  - 2025-07-30
+  - 2025-07-31
+  - 2025-08-01
+
+# CoMET weeks (alternate weeks starting with Feb 3rd)
+comet_on_weeks:
+  - 2025-02-03   # Week 1
+  - 2025-02-17   # Week 3  
+  - 2025-03-03   # Week 5
+  - 2025-03-17   # Week 7
+  - 2025-03-31   # Week 9
+  - 2025-04-14   # Week 11
+  - 2025-04-28   # Week 13
+  - 2025-05-12   # Week 15
+  - 2025-05-26   # Week 17
+  - 2025-06-09   # Week 19
+  - 2025-06-23   # Week 21
+  - 2025-07-07   # Week 23
+  - 2025-07-21   # Week 25
+
+# Regional Training Days
+registrar_training_days:
+  - 2025-02-12   # Wednesday monthly
+  - 2025-03-12
+  - 2025-04-09
+  - 2025-05-14
+  - 2025-06-11
+  - 2025-07-09
+
+sho_training_days:
+  - 2025-02-19   # Wednesday monthly (different from reg)
+  - 2025-03-19
+  - 2025-04-16
+  - 2025-05-21
+  - 2025-06-18
+  - 2025-07-16
+
+unit_training_days:
+  - 2025-02-26   # Last Wednesday of month
+  - 2025-03-26
+  - 2025-04-30
+  - 2025-05-28
+  - 2025-06-25
+  - 2025-07-30
+
+# New starter induction days
+induction_days:
+  - 2025-02-03   # First day of rota
+  - 2025-02-04   # Two-day induction
+
+# Staffing targets
+max_day_clinicians: 3           # Max short day doctors
+ideal_weekday_day_clinicians: 2 # Target for weekdays
+min_weekday_day_clinicians: 1   # Minimum coverage
+
+# Weekly working hour targets (average over 26 weeks)
+min_weekly_hours: 42.0  # 42 hours * WTE minimum
+max_weekly_hours: 47.0  # 47 hours * WTE maximum
