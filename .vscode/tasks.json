@@ -18,6 +18,25 @@
       "type": "shell",
       "command": "pytest -q",
       "problemMatcher": []
+    },
+    {
+      "label": "Restart Server",
+      "type": "shell",
+      "command": "./start_dev_server.sh",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Check Server Status",
+      "type": "shell",
+      "command": "curl -s http://localhost:8000/docs && echo '✅ Server is running' || echo '❌ Server is not running'",
+      "problemMatcher": []
     }
   ]
 }

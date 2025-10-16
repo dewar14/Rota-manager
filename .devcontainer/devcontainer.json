@@ -8,6 +8,14 @@
     "ghcr.io/devcontainers/features/git:1": {}
   },
   "postCreateCommand": "pip install -r requirements.txt",
+  "postStartCommand": "./start_dev_server.sh",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "Medical Rota API",
+      "onAutoForward": "notify"
+    }
+  },
   "customizations": {
     "vscode": {
       "settings": {
