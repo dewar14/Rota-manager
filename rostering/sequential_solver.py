@@ -302,9 +302,49 @@ class SequentialSolver:
         
         print(f"\nTotal COMET nights assigned: {total_cmn_assigned}")
         
+        # Analyze block patterns vs singletons
+        print("\n📊 BLOCK PATTERN ANALYSIS:")
+        total_blocks = 0
+        total_singletons = 0
+        
+        for p_idx, person in comet_eligible:
+            blocks = 0
+            singletons = 0
+            consecutive_count = 0
+            
+            for day in self.days:
+                assignment = self.partial_roster[day.isoformat()][person.id]
+                if assignment == ShiftType.COMET_NIGHT.value:
+                    consecutive_count += 1
+                else:
+                    if consecutive_count > 0:
+                        if consecutive_count == 1:
+                            singletons += 1
+                        else:
+                            blocks += 1
+                        consecutive_count = 0
+            
+            # Handle end of period
+            if consecutive_count > 0:
+                if consecutive_count == 1:
+                    singletons += 1
+                else:
+                    blocks += 1
+            
+            total_blocks += blocks
+            total_singletons += singletons
+            
+            if blocks > 0 or singletons > 0:
+                print(f"  {person.name}: {blocks} blocks, {singletons} singletons")
+        
+        print(f"📈 Overall: {total_blocks} blocks, {total_singletons} singletons")
+        if total_singletons > 0:
+            singleton_percentage = (total_singletons / (total_blocks + total_singletons)) * 100
+            print(f"🎯 Singleton rate: {singleton_percentage:.1f}% (should be minimal)")
+        
         # Count expected COMET nights needed
         expected_cmn = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
-        print(f"Expected COMET nights needed: {expected_cmn}")
+        print(f"\nExpected COMET nights needed: {expected_cmn}")
         
         # Show unassigned nights
         if total_cmn_assigned < expected_cmn:
@@ -353,15 +393,19 @@ class SequentialSolver:
                 
             print(f"\nRound {assignment_round}: Assigning to {person.name} (WTE: {person.wte})")
             
-            # Determine block size based on WTE
+            # Determine block size based on WTE - singletons are absolute last resort
             if person.wte >= 1.0:
-                preferred_block_sizes = [4, 3, 1]  # Prefer 4, fallback to 3, single as last resort
+                # WTE 1.0: Prefer 4+3 pairs for 7-day coverage, blocks of 2 only to prevent singletons
+                preferred_block_sizes = [4, 3, 2]  # NO singletons in normal assignment
             elif person.wte >= 0.8:
-                preferred_block_sizes = [3, 4, 1]  # Prefer 3, fallback to 4, single as last resort
+                # WTE 0.8: Similar to WTE 1.0 but weight towards 3+4, blocks of 2 more acceptable
+                preferred_block_sizes = [3, 4, 2]  # NO singletons in normal assignment
             elif person.wte >= 0.6:
-                preferred_block_sizes = [2, 3, 1]  # Prefer 2, fallback to 3, single as last resort
+                # WTE 0.6: Favor 2-night blocks, 3 occasionally, 4 exceptional only
+                preferred_block_sizes = [2, 3, 4]  # NO singletons in normal assignment
             else:
-                preferred_block_sizes = [2, 1]     # Part-time prefers 2, single as fallback
+                # Very part-time: Stick to 2-night blocks
+                preferred_block_sizes = [2, 3]     # NO singletons in normal assignment
             
             print(f"  Target block sizes (in preference order): {preferred_block_sizes}")
             
@@ -374,18 +418,35 @@ class SequentialSolver:
                 current_comet_nights = running_totals[p_idx]['comet_nights']
                 expected_nights = int(7 * person.wte)  # Rough target
                 print(f"     Current COMET nights: {current_comet_nights}, Target: ~{expected_nights}")
-                if current_comet_nights >= expected_nights * 0.8:  # 80% of target
-                    print(f"     ✓ {person.name} has sufficient assignments ({current_comet_nights}), continuing with next doctor")
+                
+                # Be more lenient about stopping block assignment - singletons will fill gaps later
+                if current_comet_nights >= expected_nights * 0.7:  # 70% of target is sufficient for block phase
+                    print(f"     ✓ {person.name} has reasonable assignments ({current_comet_nights}), continuing with next doctor")
+                    print("     💡 Any remaining needs will be filled by gap-filling singletons later")
                     continue  # Try next doctor instead of breaking
                 else:
                     print(f"     ⚠️ {person.name} needs more assignments, but no blocks available")
-                break
+                    print("     🔄 Will try other doctors and fill gaps with singletons later")
+                    continue  # Don't break - try other doctors first
                 
             assignment_round += 1
             
-            # Safety check to prevent infinite loops
-            if assignment_round > 20:
-                print("Maximum assignment rounds reached")
+            # Safety check to prevent infinite loops - but be more generous in block assignment phase
+            if assignment_round > 30:  # Increased from 20 to allow more block attempts
+                print("Maximum assignment rounds reached - proceeding to gap-filling phase")
+                break
+                
+            # Also break if we've tried all doctors multiple times without success
+            unsuccessful_attempts = 0
+            for p_idx, person in comet_eligible:
+                current_nights = running_totals[p_idx]['comet_nights']
+                expected_nights = int(7 * person.wte)
+                if current_nights < expected_nights * 0.7:
+                    unsuccessful_attempts += 1
+            
+            # If most doctors still need assignments but we're not making progress, stop block phase
+            if unsuccessful_attempts == 0:
+                print("🎯 All doctors have sufficient block assignments - proceeding to gap-filling")
                 break
         
         # After assignment, check for any uncovered COMET nights
@@ -417,6 +478,7 @@ class SequentialSolver:
             
             if week_uncovered:
                 print(f"  🔧 FIXING COVERAGE GAPS: {len(week_uncovered)} days need assignment")
+                print("     ⚠️  RESORTING TO SINGLETON NIGHTS (last resort only)")
                 # Try to assign single nights to uncovered days
                 for day in week_uncovered:
                     self._assign_single_comet_night(day, comet_eligible, running_totals)
