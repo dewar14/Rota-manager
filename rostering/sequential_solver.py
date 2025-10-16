@@ -459,6 +459,13 @@ class SequentialSolver:
     def _assign_comet_night_block(self, p_idx, person, preferred_block_sizes, comet_week_ranges, running_totals):
         """Try to assign a COMET night block to the specified doctor."""
         
+        # Show current doctor workload
+        current_assignments = 0
+        for day in self.days:
+            if self.partial_roster[day.isoformat()][person.id] != ShiftType.OFF.value:
+                current_assignments += 1
+        print(f"    📊 {person.name} currently has {current_assignments} assigned days out of {len(self.days)}")
+        
         for block_size in preferred_block_sizes:
             print(f"    🔍 Trying block size: {block_size}")
             blocks_tried = 0
@@ -478,12 +485,18 @@ class SequentialSolver:
                     # Check if all days are available for this person
                     available = True
                     unavailable_reason = None
+                    unavailable_days = []
+                    
                     for day in consecutive_days:
                         current_assignment = self.partial_roster[day.isoformat()][person.id]
                         if current_assignment != ShiftType.OFF.value:
                             available = False
-                            unavailable_reason = f"Doctor {person.name} already assigned {current_assignment} on {day}"
-                            break
+                            unavailable_days.append(f"{day}({current_assignment})")
+                    
+                    if not available:
+                        unavailable_reason = f"Days busy: {', '.join(unavailable_days[:3])}"  # Show first 3
+                        if len(unavailable_days) > 3:
+                            unavailable_reason += f" +{len(unavailable_days)-3} more"
                     
                     if available:
                         # Check if CMN is needed on these days (not already assigned to someone else)
@@ -557,23 +570,49 @@ class SequentialSolver:
             return False
     
     def _check_night_rest_ok(self, night_day, doctor_id):
-        """Check if assigning a night shift on this day would violate 46h rest rule."""
+        """Check if assigning a night shift on this day would violate 46h rest rule.
         
-        # Very simplified check - just ensure next day is OFF
+        The 46h rest rule applies AFTER the end of a night shift BLOCK, not after every individual night.
+        For consecutive nights, only the day after the LAST night needs to be free.
+        
+        Example: Sun-Wed COMET nights (4x12h = 48h total)
+        - Thu must be OFF (46h rest before Fri 8am)  
+        - Fri onwards can work normally
+        """
+        
         night_day_idx = None
         for i, day in enumerate(self.days):
             if day == night_day:
                 night_day_idx = i
                 break
         
-        if night_day_idx is None or night_day_idx >= len(self.days) - 1:
-            return True  # End of period, OK
+        if night_day_idx is None:
+            return True  # Day not found, assume OK
+            
+        # Check if this would be the END of a night block
+        # Look ahead to see if more nights follow
+        is_block_end = True
+        if night_day_idx + 1 < len(self.days):
+            next_day = self.days[night_day_idx + 1]
+            next_assignment = self.partial_roster[next_day.isoformat()][doctor_id]
+            if next_assignment == ShiftType.COMET_NIGHT.value:
+                is_block_end = False  # More nights in this block
         
-        next_day = self.days[night_day_idx + 1]
-        next_assignment = self.partial_roster[next_day.isoformat()][doctor_id]
+        # If this is the end of a night block, check 46h rest
+        if is_block_end and night_day_idx + 1 < len(self.days):
+            rest_day = self.days[night_day_idx + 1]
+            rest_assignment = self.partial_roster[rest_day.isoformat()][doctor_id]
+            
+            # Must have at least one full day off after night block ends
+            working_shifts = [ShiftType.COMET_DAY.value, ShiftType.LONG_DAY_REG.value, 
+                            ShiftType.LONG_DAY_SHO.value, ShiftType.SHORT_DAY.value,
+                            ShiftType.NIGHT_REG.value, ShiftType.NIGHT_SHO.value]
+            
+            if rest_assignment in working_shifts:
+                print(f"      ❌ Night rest violation: {doctor_id} would work {rest_assignment} on {rest_day} (day after night block)")
+                return False
         
-        # OK if next day is OFF
-        return next_assignment == ShiftType.OFF.value
+        return True
     
     def _solve_comet_days_stage(self, timeout_seconds: int) -> SequentialSolveResult:
         """Stage 4: Assign COMET day shifts after holidays are covered."""
