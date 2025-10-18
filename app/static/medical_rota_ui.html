@@ -122,6 +122,14 @@
             background: #c0392b;
         }
         
+        .btn-primary {
+            background: #3498db;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        
         .btn-group {
             display: flex;
             gap: 1rem;
@@ -488,6 +496,7 @@
                     
                     <div class="btn-group">
                         <button class="btn btn-success" id="btn-start-solve" onclick="startSolve()">🚀 Generate Rota</button>
+                        <button class="btn btn-primary" id="btn-interactive-solve" onclick="startInteractiveSolve()">⏸️ Interactive Mode</button>
                         <button class="btn btn-danger" id="btn-stop-solve" onclick="stopSolve()" disabled>⏹️ Stop</button>
                     </div>                    <div id="solve-progress" style="display: none;">
                         <h4>Progress:</h4>
@@ -953,7 +962,293 @@
             currentRosterData = null;
             solvePayload = null;
         }
+
+        function startInteractiveSolve() {
+            if (solveInProgress) return;
+            
+            // Gather the same input data as regular solve
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const cometStart = document.getElementById('comet-start').value;
+            const bankHolidays = document.getElementById('bank-holidays').value.split('\n').map(x => x.split(' ')[0]).filter(x => x);
+            
+            const doctors = Array.from(document.querySelectorAll('.doctor-card')).map(card => ({
+                name: card.querySelector('input[type="text"]').value,
+                grade: card.querySelector('select[name="grade"]').value,
+                wte: parseFloat(card.querySelector('select[name="wte"]').value),
+                comet_eligible: card.querySelector('input[name="comet"]').checked
+            }));
+
+            const cometWeeks = generateCometWeeks(cometStart, startDate, endDate);
+
+            const payload = {
+                people: doctors.map((d, i) => ({
+                    id: 'dr' + (i+1),
+                    name: d.name,
+                    grade: d.grade,
+                    wte: d.wte,
+                    comet_eligible: d.comet_eligible
+                })),
+                config: {
+                    start_date: startDate,
+                    end_date: endDate,
+                    comet_on_weeks: cometWeeks,
+                    bank_holidays: bankHolidays
+                },
+                timeout_per_stage: 300,
+                auto_continue: false  // Key difference - interactive mode
+            };
+
+            // Show interactive mode panel
+            showInteractiveMode();
+            
+            // Start interactive solving
+            runInteractiveSolve(payload);
+        }
+
+        function showInteractiveMode() {
+            // Create or show interactive mode panel
+            let panel = document.getElementById('interactive-panel');
+            if (!panel) {
+                panel = document.createElement('div');
+                panel.id = 'interactive-panel';
+                panel.className = 'card';
+                panel.style.position = 'fixed';
+                panel.style.top = '20%';
+                panel.style.left = '20%';
+                panel.style.width = '60%';
+                panel.style.height = '60%';
+                panel.style.zIndex = '1000';
+                panel.style.backgroundColor = 'white';
+                panel.style.border = '2px solid #2c3e50';
+                panel.style.borderRadius = '8px';
+                panel.style.padding = '2rem';
+                panel.style.overflow = 'auto';
+                panel.innerHTML = `
+                    <div id="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; cursor: move; background: #f1f2f6; margin: -2rem -2rem 1rem -2rem; padding: 1rem 2rem; border-radius: 8px 8px 0 0;">
+                        <h3 style="margin: 0;">🎯 Interactive Solver Mode</h3>
+                        <button onclick="closeInteractiveMode()" style="background: #e74c3c; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">✕</button>
+                    </div>
+                    <div id="interactive-content">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <p style="margin: 0;">Starting interactive solve mode...</p>
+                            <button onclick="toggleOutput()" id="toggle-output-btn" style="background: #3498db; color: white; border: none; padding: 0.3rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Hide Output</button>
+                        </div>
+                        <div id="interactive-output" style="background: #f8f9fa; border: 1px solid #ddd; padding: 1rem; margin: 1rem 0; font-family: monospace; font-size: 0.85rem; max-height: 600px; overflow-y: auto; white-space: pre-wrap;"></div>
+                        <div id="interactive-controls" style="display: none;">
+                            <p><strong>Choose your action:</strong></p>
+                            <button class="btn btn-success" onclick="continueInteractive()" style="margin: 0.5rem;">Continue</button>
+                            <button class="btn btn-info" onclick="showStats()" style="margin: 0.5rem;">Show Statistics</button>
+                            <button class="btn btn-warning" onclick="showViolations()" style="margin: 0.5rem;">Show Violations</button>
+                            <button class="btn btn-secondary" onclick="pauseInteractive()" style="margin: 0.5rem;">Pause</button>
+                            <button class="btn btn-danger" onclick="closeInteractiveMode()" style="margin: 0.5rem;">Stop</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(panel);
+            }
+            panel.style.display = 'block';
+        }
+
+        function toggleOutput() {
+            const output = document.getElementById('interactive-output');
+            const toggleBtn = document.getElementById('toggle-output-btn');
+            
+            if (output.style.display === 'none') {
+                output.style.display = 'block';
+                toggleBtn.textContent = 'Hide Output';
+                toggleBtn.style.background = '#3498db';
+            } else {
+                output.style.display = 'none';
+                toggleBtn.textContent = 'Show Output';
+                toggleBtn.style.background = '#27ae60';
+            }
+        }
+
+        function closeInteractiveMode() {
+            const panel = document.getElementById('interactive-panel');
+            if (panel) {
+                panel.style.display = 'none';
+            }
+            solveInProgress = false;
+        }
+
+        // Global state for interactive solving
+        let interactiveState = {
+            currentStage: null,
+            nextStage: null,
+            payload: null
+        };
+
+        function runInteractiveSolve(payload) {
+            solveInProgress = true;
+            interactiveState.payload = payload;
+            
+            // Start interactive solving
+            fetch('/solve_interactive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...payload, action: 'start' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                handleInteractiveResponse(data);
+            })
+            .catch(error => {
+                console.error('Interactive solve error:', error);
+                const outputDiv = document.getElementById('interactive-output');
+                outputDiv.innerHTML += `<div style="color: red;">❌ Network error: ${error}</div>`;
+                outputDiv.scrollTop = outputDiv.scrollHeight;
+                solveInProgress = false;
+            });
+        }
+
+        function handleInteractiveResponse(data) {
+            const outputDiv = document.getElementById('interactive-output');
+            const controlsDiv = document.getElementById('interactive-controls');
+            
+            if (data.success) {
+                outputDiv.innerHTML += `<div style="color: green;">✅ ${data.message}</div>`;
+                outputDiv.innerHTML += `<div><strong>Stage:</strong> ${data.stage}</div>`;
+                
+                // Auto-scroll to show latest output
+                outputDiv.scrollTop = outputDiv.scrollHeight;
+                
+                interactiveState.currentStage = data.stage;
+                interactiveState.nextStage = data.next_stage;
+                
+                if (data.action === 'checkpoint' && data.next_stage) {
+                    outputDiv.innerHTML += `<div><strong>Next Stage:</strong> ${data.next_stage}</div>`;
+                    outputDiv.innerHTML += `<div style="color: blue;">🛑 Checkpoint reached. Choose your action:</div>`;
+                    controlsDiv.style.display = 'block';
+                } else if (data.action === 'complete') {
+                    outputDiv.innerHTML += `<div style="color: blue;">🎉 All stages completed!</div>`;
+                    solveInProgress = false;
+                    controlsDiv.style.display = 'none';
+                    if (data.partial_roster) {
+                        displayRotaResults(data.partial_roster);
+                        showTab('results');
+                    }
+                }
+            } else {
+                outputDiv.innerHTML += `<div style="color: red;">❌ Error: ${data.message}</div>`;
+                solveInProgress = false;
+                controlsDiv.style.display = 'none';
+            }
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        }
+
+        function continueInteractive() {
+            if (!interactiveState.nextStage) {
+                document.getElementById('interactive-output').innerHTML += `<div style="color: red;">❌ No next stage to continue to</div>`;
+                return;
+            }
+            
+            const outputDiv = document.getElementById('interactive-output');
+            outputDiv.innerHTML += `<div style="color: blue;">➡️ Continuing to ${interactiveState.nextStage}...</div>`;
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+            document.getElementById('interactive-controls').style.display = 'none';
+            
+            fetch('/solve_interactive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'continue', 
+                    next_stage: interactiveState.nextStage 
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                handleInteractiveResponse(data);
+            })
+            .catch(error => {
+                console.error('Continue error:', error);
+                document.getElementById('interactive-output').innerHTML += `<div style="color: red;">❌ Continue error: ${error}</div>`;
+            });
+        }
+
+        function showStats() {
+            document.getElementById('interactive-output').innerHTML += `<div style="color: blue;">📊 Fetching statistics...</div>`;
+            
+            fetch('/solve_interactive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'stats' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('interactive-output').innerHTML += `<div style="color: blue;">📊 ${data.message}</div>`;
+            })
+            .catch(error => {
+                document.getElementById('interactive-output').innerHTML += `<div style="color: red;">❌ Stats error: ${error}</div>`;
+            });
+        }
+
+        function showViolations() {
+            document.getElementById('interactive-output').innerHTML += `<div style="color: orange;">⚠️ Fetching constraint violations...</div>`;
+            
+            fetch('/solve_interactive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'violations' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('interactive-output').innerHTML += `<div style="color: orange;">⚠️ ${data.message}</div>`;
+            })
+            .catch(error => {
+                document.getElementById('interactive-output').innerHTML += `<div style="color: red;">❌ Violations error: ${error}</div>`;
+            });
+        }
+
+        function pauseInteractive() {
+            document.getElementById('interactive-output').innerHTML += `<div style="color: orange;">⏸️ Solver paused. Use Continue to resume.</div>`;
+            solveInProgress = false;
+        }
         
+        function generateDoctorKey() {
+            const doctors = Array.from(document.querySelectorAll('.doctor-card')).map((card, index) => ({
+                id: `dr${index + 1}`,
+                name: card.querySelector('input[type="text"]').value || `Doctor ${index + 1}`,
+                wte: parseFloat(card.querySelector('select[name="wte"]').value || 0.8),
+                grade: card.querySelector('select[name="grade"]').value || 'Registrar',
+                comet: card.querySelector('input[name="comet"]').checked
+            })).filter(d => d.name.trim() !== '' && d.name !== `Doctor ${doctors.length}`);
+
+            let keyHtml = `
+                <div class="card" style="margin-bottom: 1rem; background: #f8f9fa; border-left: 4px solid #3498db;">
+                    <div style="padding: 1rem;">
+                        <h4 style="margin: 0 0 1rem 0; color: #2c3e50;">📋 Doctor Key & WTE Information</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.5rem; font-size: 0.9rem;">
+            `;
+            
+            doctors.forEach(doctor => {
+                const cometStatus = doctor.comet ? '✓ COMET' : '✗ No COMET';
+                keyHtml += `
+                    <div style="padding: 0.5rem; background: white; border-radius: 4px; border: 1px solid #ddd;">
+                        <strong>${doctor.id}</strong> = ${doctor.name} 
+                        <span style="color: #666;">(WTE: ${doctor.wte}, ${doctor.grade}, ${cometStatus})</span>
+                    </div>
+                `;
+            });
+            
+            keyHtml += `
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            return keyHtml;
+        }
+
+        function continueFromResults() {
+            if (interactiveState.nextStage) {
+                continueInteractive();
+            } else {
+                alert('No next stage available to continue to.');
+            }
+        }
+
         function displayRotaResults(data) {
             const container = document.getElementById('rota-display');
             container.innerHTML = '';
@@ -961,6 +1256,16 @@
                 container.innerHTML = '<div class="alert alert-error">No roster generated. Please check input or try again.</div>';
                 return;
             }
+
+            // Add doctor key at the top
+            const doctorKeyHtml = generateDoctorKey();
+            
+            // Add continue button if in interactive mode
+            const continueButtonHtml = solveInProgress ? 
+                `<div style="margin-bottom: 1rem;">
+                    <button class="btn btn-primary" onclick="showInteractiveMode()" style="margin-right: 1rem;">📋 Return to Interactive Mode</button>
+                    <button class="btn btn-success" onclick="continueFromResults()" style="margin-right: 1rem;">➡️ Continue to Next Stage</button>
+                </div>` : '';
             
             // Build shift legend first
             const legendHtml = `
@@ -995,8 +1300,20 @@
                 dates.flatMap(date => Object.keys(roster[date]))
             )).sort();
             
+            // Create doctor ID to name mapping
+            const doctorCards = Array.from(document.querySelectorAll('.doctor-card'));
+            const idToName = {};
+            doctorCards.forEach((card, index) => {
+                const doctorId = `dr${index + 1}`;
+                const doctorName = card.querySelector('input[type="text"]').value || `Doctor ${index + 1}`;
+                idToName[doctorId] = doctorName;
+            });
+
             let html = legendHtml + '<table class="rota-table"><thead><tr><th>Date</th>';
-            doctorNames.forEach(name => html += `<th style="min-width: 80px;">${name.replace(/^dr\d+$/, 'Dr ' + name.slice(2))}</th>`);
+            doctorNames.forEach(name => {
+                const displayName = idToName[name] || name.replace(/^dr\d+$/, 'Dr ' + name.slice(2));
+                html += `<th style="min-width: 120px;" title="${name}">${displayName}</th>`;
+            });
             html += '</tr></thead><tbody>';
             
             dates.forEach(date => {
@@ -1024,7 +1341,9 @@
             // Add summary statistics
             html += generateRotaSummary(roster, doctorNames);
             
-            container.innerHTML = html;
+            // Combine all HTML content
+            const finalHtml = doctorKeyHtml + continueButtonHtml + html;
+            container.innerHTML = finalHtml;
         }
         
         function formatDateForDisplay(dateStr) {
@@ -1092,6 +1411,16 @@
             const totalDays = rosterDates.length;
             const totalWeeks = totalDays / 7;
             
+            // Create doctor ID to name and WTE mapping for workload table
+            const doctorCards = Array.from(document.querySelectorAll('.doctor-card'));
+            const doctorInfo = {};
+            doctorCards.forEach((card, index) => {
+                const doctorId = `dr${index + 1}`;
+                const doctorName = card.querySelector('input[type="text"]').value || `Doctor ${index + 1}`;
+                const doctorWte = parseFloat(card.querySelector('select[name="wte"]').value || 0.8);
+                doctorInfo[doctorId] = { name: doctorName, wte: doctorWte };
+            });
+
             doctorNames.forEach(doctor => {
                 const counts = doctorShiftCounts[doctor];
                 const cometNights = (counts['CMN'] || 0);
@@ -1106,13 +1435,14 @@
                 const totalHours = (cometNights * 12) + (cometDays * 12) + (unitNights * 13) + (longDays * 13) + (shortDays * 9);
                 const avgWeeklyHours = totalWeeks > 0 ? (totalHours / totalWeeks).toFixed(1) : '0.0';
                 
-                // Get WTE from doctor data (approximation - would need actual data)
-                const wte = doctor.includes('Alexander') || doctor.includes('Sarah') ? '0.6' : 
-                           doctor.includes('Abdifatah') || doctor.includes('Mahmoud') ? '1.0' : '0.8';
+                // Get actual doctor info
+                const info = doctorInfo[doctor] || { name: doctor, wte: 0.8 };
+                const displayName = info.name;
+                const actualWte = info.wte;
                 
                 summaryHtml += '<tr>';
-                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px;"><strong>${doctor}</strong></td>`;
-                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${wte}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px;"><strong>${displayName}</strong> <span style="color: #666; font-size: 0.8em;">(${doctor})</span></td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${actualWte}</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${cometNights}</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${cometDays}</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${unitNights}</td>`;
@@ -1155,7 +1485,7 @@
                 { name: 'Abdifatah Mohamud', grade: 'Registrar', wte: '1.0', comet: true, startDate: null, leaveDays: 15 },
                 { name: 'Hanin El Abbas', grade: 'Registrar', wte: '0.8', comet: true, startDate: null, leaveDays: 15 },
                 { name: 'Sarah Hallett', grade: 'Registrar', wte: '0.6', comet: false, startDate: null, leaveDays: 15 },
-                { name: 'Manan Kamboj', grade: 'Registrar', wte: '0.8', comet: true, startDate: null, leaveDays: 15 },
+                { name: 'Manan Kamboj', grade: 'Registrar', wte: '1.0', comet: true, startDate: null, leaveDays: 15 },
                 { name: 'Mahmoud', grade: 'Registrar', wte: '1.0', comet: true, startDate: null, leaveDays: 15 },
                 { name: 'Sarah Walker', grade: 'Registrar', wte: '0.6', comet: false, startDate: null, leaveDays: 15 }
             ];

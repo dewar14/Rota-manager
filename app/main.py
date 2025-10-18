@@ -117,6 +117,63 @@ async def solve_with_checkpoints_endpoint(payload: dict):
     except Exception as e:
         return {"success": False, "message": f"Error during checkpoint solve: {e}"}
 
+@app.post('/solve_interactive')
+async def solve_interactive_endpoint(payload: dict):
+    """Interactive solving with stage-by-stage control."""
+    global sequential_solver_instance
+    from rostering.sequential_solver import SequentialSolver
+    
+    try:
+        action = payload.get('action', 'start')  # start, continue, stats, violations, pause
+        
+        if action == 'start':
+            # Initialize new solver
+            problem_raw = payload.get('problem') or payload
+            problem = ProblemInput.parse_obj(problem_raw)
+            sequential_solver_instance = SequentialSolver(problem)
+            
+            # Start with first stage
+            result = sequential_solver_instance.solve_stage('comet_nights', timeout_seconds=300)
+            
+            return {
+                "success": result.success,
+                "message": result.message,
+                "stage": result.stage,
+                "next_stage": getattr(result, 'next_stage', None),
+                "action": "checkpoint",
+                "partial_roster": result.partial_roster if result.success else None
+            }
+            
+        elif action == 'continue' and sequential_solver_instance:
+            # Continue to next stage
+            next_stage = payload.get('next_stage', 'nights')
+            result = sequential_solver_instance.solve_stage(next_stage, timeout_seconds=300)
+            
+            return {
+                "success": result.success,
+                "message": result.message,
+                "stage": result.stage,
+                "next_stage": getattr(result, 'next_stage', None),
+                "action": "checkpoint" if getattr(result, 'next_stage', None) else "complete",
+                "partial_roster": result.partial_roster if result.success else None
+            }
+            
+        elif action == 'stats' and sequential_solver_instance:
+            # Return current statistics
+            sequential_solver_instance._show_detailed_statistics()
+            return {"success": True, "message": "Statistics displayed in console", "action": "stats"}
+            
+        elif action == 'violations' and sequential_solver_instance:
+            # Return constraint violations
+            sequential_solver_instance._show_constraint_violations()
+            return {"success": True, "message": "Violations displayed in console", "action": "violations"}
+            
+        else:
+            return {"success": False, "message": f"Invalid action: {action}"}
+            
+    except Exception as e:
+        return {"success": False, "message": f"Error during interactive solve: {e}"}
+
 @app.get('/medical-rota')
 def medical_rota_ui():
     """Comprehensive 6-month medical rota planning interface."""

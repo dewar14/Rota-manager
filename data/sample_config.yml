@@ -1,9 +1,21 @@
-start_date: 2025-02-05  # first Wednesday in February (example block start)
-end_date: 2025-02-18
+start_date: 2026-01-01  # 6-month medical rotation period
+end_date: 2026-06-30
 bank_holidays: []
-# Mark Mondays for COMET 'on' weeks; here we enable COMET on the first week only
+# Mark Mondays for COMET 'on' weeks; alternating weeks throughout the 6-month period
 comet_on_weeks:
-  - 2025-02-10
+  - 2026-01-06   # Week 1
+  - 2026-01-20   # Week 3  
+  - 2026-02-03   # Week 5
+  - 2026-02-17   # Week 7
+  - 2026-03-03   # Week 9
+  - 2026-03-17   # Week 11
+  - 2026-03-31   # Week 13
+  - 2026-04-14   # Week 15
+  - 2026-04-28   # Week 17
+  - 2026-05-12   # Week 19
+  - 2026-05-26   # Week 21
+  - 2026-06-09   # Week 23
+  - 2026-06-23   # Week 25
 max_day_clinicians: 5
 ideal_weekday_day_clinicians: 4
 min_weekday_day_clinicians: 3

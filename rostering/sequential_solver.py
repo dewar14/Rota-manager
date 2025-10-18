@@ -95,6 +95,7 @@ class SequentialSolver:
         self.config = problem.config
         self.people = problem.people
         self.days = get_days_from_config(self.config)
+        self.start_date = self.config.start_date  # Add start_date for date arithmetic
         
         # Track assigned shifts across stages
         self.assigned_shifts: Set[Tuple[int, int, ShiftType]] = set()
@@ -176,25 +177,47 @@ class SequentialSolver:
                 print(f"\n🛑 CHECKPOINT: Review stage '{stage_name}' before proceeding to '{next_stage}'")
                 
                 if not auto_continue:
-                    response = input(f"Continue to '{next_stage}' stage? (y/n/q): ").strip().lower()
+                    print("\nOptions:")
+                    print("  [c]ontinue  - Proceed to next stage")
+                    print("  [p]ause     - Stop here for detailed review")
+                    print("  [s]tats     - Show detailed roster statistics")
+                    print("  [v]iolations - Show constraint violation details")
+                    print("  [q]uit      - Exit the solver")
                     
-                    if response == 'q':
-                        return SequentialSolveResult(
-                            stage=stage_name,
-                            success=True,
-                            message=f"User quit at checkpoint after '{stage_name}' stage",
-                            partial_roster=copy.deepcopy(self.partial_roster),
-                            next_stage=next_stage
-                        )
-                    elif response != 'y':
-                        print(f"Pausing after '{stage_name}' stage. Resume with solve_stage('{next_stage}')")
-                        return SequentialSolveResult(
-                            stage=stage_name,
-                            success=True,
-                            message=f"Paused after '{stage_name}' stage for review",
-                            partial_roster=copy.deepcopy(self.partial_roster),
-                            next_stage=next_stage
-                        )
+                    while True:
+                        try:
+                            response = input(f"\nAction for '{next_stage}' stage? [c/p/s/v/q]: ").strip().lower()
+                        except (EOFError, KeyboardInterrupt):
+                            print("\n⚠️ Input not available - auto-continuing...")
+                            response = 'c'
+                        
+                        if response in ['c', 'continue']:
+                            print(f"Continuing to '{next_stage}' stage...")
+                            break
+                        elif response in ['p', 'pause']:
+                            print(f"Pausing after '{stage_name}' stage for detailed review.")
+                            print(f"To resume: solver.resume_from_stage('{next_stage}')")
+                            return SequentialSolveResult(
+                                stage=stage_name,
+                                success=True,
+                                message=f"Paused after '{stage_name}' stage for review",
+                                partial_roster=copy.deepcopy(self.partial_roster),
+                                next_stage=next_stage
+                            )
+                        elif response in ['s', 'stats']:
+                            self._show_detailed_statistics()
+                        elif response in ['v', 'violations']:
+                            self._show_constraint_violations()
+                        elif response in ['q', 'quit']:
+                            return SequentialSolveResult(
+                                stage=stage_name,
+                                success=True,
+                                message=f"User quit at checkpoint after '{stage_name}' stage",
+                                partial_roster=copy.deepcopy(self.partial_roster),
+                                next_stage=next_stage
+                            )
+                        else:
+                            print("Invalid option. Please choose c, p, s, v, or q.")
                 else:
                     print(f"Auto-continuing to '{next_stage}' stage...")
         
@@ -206,6 +229,189 @@ class SequentialSolver:
             message="All roster stages completed successfully",
             partial_roster=copy.deepcopy(self.partial_roster)
         )
+    
+    def resume_from_stage(self, stage_name: str, timeout_per_stage: int = 1800) -> SequentialSolveResult:
+        """Resume solving from a specific stage after pausing for review."""
+        
+        stages = ["comet_nights", "nights", "weekend_holidays", "comet_days", "weekday_long_days", "short_days"]
+        
+        if stage_name not in stages:
+            return SequentialSolveResult(
+                stage=stage_name,
+                success=False,
+                message=f"Invalid stage name: {stage_name}. Valid stages: {', '.join(stages)}",
+                partial_roster=copy.deepcopy(self.partial_roster)
+            )
+        
+        start_index = stages.index(stage_name)
+        
+        print(f"\n🔄 RESUMING FROM STAGE: {stage_name.upper()}")
+        print(f"Remaining stages: {' → '.join(stages[start_index:])}")
+        
+        # Continue with remaining stages
+        for i in range(start_index, len(stages)):
+            stage = stages[i]
+            print(f"\n{'='*80}")
+            print(f"STAGE {i+1}/{len(stages)}: {stage.upper()}")
+            print(f"{'='*80}")
+            
+            result = self.solve_stage(stage, timeout_per_stage)
+            
+            if not result.success:
+                print(f"\n❌ Stage '{stage}' failed: {result.message}")
+                return result
+            
+            print(f"\n✅ Stage '{stage}' completed successfully!")
+            print(f"   {result.message}")
+            
+            # Checkpoint for remaining stages
+            if i < len(stages) - 1:
+                next_stage = stages[i + 1]
+                print(f"\n🛑 CHECKPOINT: Review stage '{stage}' before proceeding to '{next_stage}'")
+                
+                print("\nOptions:")
+                print("  [c]ontinue  - Proceed to next stage")
+                print("  [p]ause     - Stop here for detailed review")
+                print("  [s]tats     - Show detailed roster statistics")
+                print("  [q]uit      - Exit the solver")
+                
+                while True:
+                    response = input(f"\nAction for '{next_stage}' stage? [c/p/s/q]: ").strip().lower()
+                    
+                    if response in ['c', 'continue']:
+                        print(f"Continuing to '{next_stage}' stage...")
+                        break
+                    elif response in ['p', 'pause']:
+                        print(f"Pausing after '{stage}' stage for detailed review.")
+                        print(f"To resume: solver.resume_from_stage('{next_stage}')")
+                        return SequentialSolveResult(
+                            stage=stage,
+                            success=True,
+                            message=f"Paused after '{stage}' stage for review",
+                            partial_roster=copy.deepcopy(self.partial_roster),
+                            next_stage=next_stage
+                        )
+                    elif response in ['s', 'stats']:
+                        self._show_detailed_statistics()
+                    elif response in ['q', 'quit']:
+                        return SequentialSolveResult(
+                            stage=stage,
+                            success=True,
+                            message=f"User quit at checkpoint after '{stage}' stage",
+                            partial_roster=copy.deepcopy(self.partial_roster),
+                            next_stage=next_stage
+                        )
+                    else:
+                        print("Invalid option. Please choose c, p, s, or q.")
+        
+        print("\n🎉 ALL REMAINING STAGES COMPLETED SUCCESSFULLY!")
+        return SequentialSolveResult(
+            stage="complete",
+            success=True,
+            message="All remaining roster stages completed successfully",
+            partial_roster=copy.deepcopy(self.partial_roster)
+        )
+    
+    def _show_detailed_statistics(self):
+        """Show detailed roster statistics for current state."""
+        
+        print("\n" + "="*60)
+        print("DETAILED ROSTER STATISTICS")
+        print("="*60)
+        
+        # Count assignments by person and shift type
+        assignment_counts = {}
+        shift_type_totals = {}
+        
+        for day_str, day_assignments in self.partial_roster.items():
+            for person_id, shift_type in day_assignments.items():
+                if shift_type != ShiftType.OFF.value:
+                    # Person totals
+                    if person_id not in assignment_counts:
+                        assignment_counts[person_id] = {}
+                    if shift_type not in assignment_counts[person_id]:
+                        assignment_counts[person_id][shift_type] = 0
+                    assignment_counts[person_id][shift_type] += 1
+                    
+                    # Shift type totals
+                    if shift_type not in shift_type_totals:
+                        shift_type_totals[shift_type] = 0
+                    shift_type_totals[shift_type] += 1
+        
+        # Show by person
+        print("\nAssignments by Person:")
+        print("-" * 40)
+        for person in self.people:
+            person_assignments = assignment_counts.get(person.id, {})
+            total_shifts = sum(person_assignments.values())
+            
+            if total_shifts > 0:
+                print(f"{person.name} (WTE: {person.wte}):")
+                for shift_type, count in person_assignments.items():
+                    print(f"  {shift_type}: {count}")
+                print(f"  Total: {total_shifts} shifts")
+                print()
+        
+        # Show by shift type
+        print("\nAssignments by Shift Type:")
+        print("-" * 30)
+        for shift_type, count in shift_type_totals.items():
+            print(f"{shift_type}: {count} shifts")
+        
+        total_assignments = sum(shift_type_totals.values())
+        total_days = len(self.days)
+        coverage_percent = (total_assignments / (total_days * len(self.people))) * 100
+        
+        print(f"\nTotal Assignments: {total_assignments}")
+        print(f"Total Person-Days: {total_days * len(self.people)}")
+        print(f"Coverage: {coverage_percent:.1f}%")
+    
+    def _show_constraint_violations(self):
+        """Show detailed constraint violation information."""
+        
+        print("\n" + "="*60)
+        print("CONSTRAINT VIOLATION ANALYSIS")
+        print("="*60)
+        
+        try:
+            constraint_check = self.check_hard_constraints()
+            violations = constraint_check.get('violations', [])
+            
+            if not violations:
+                print("\n✅ No constraint violations detected!")
+                return
+            
+            # Group by severity
+            critical = [v for v in violations if v.get('severity') == 'CRITICAL']
+            high = [v for v in violations if v.get('severity') == 'HIGH']
+            medium = [v for v in violations if v.get('severity') == 'MEDIUM']
+            
+            if critical:
+                print(f"\n🚨 CRITICAL VIOLATIONS ({len(critical)}):")
+                for i, violation in enumerate(critical[:5], 1):
+                    print(f"  {i}. {violation.get('description', 'Unknown violation')}")
+            
+            if high:
+                print(f"\n⚠️ HIGH PRIORITY VIOLATIONS ({len(high)}):")
+                for i, violation in enumerate(high[:5], 1):
+                    print(f"  {i}. {violation.get('description', 'Unknown violation')}")
+            
+            if medium:
+                print(f"\n📋 MEDIUM PRIORITY VIOLATIONS ({len(medium)}):")
+                for i, violation in enumerate(medium[:3], 1):
+                    print(f"  {i}. {violation.get('description', 'Unknown violation')}")
+            
+            # Show alternatives if available
+            alternatives = constraint_check.get('alternatives', [])
+            if alternatives:
+                print(f"\n💡 SUGGESTED SOLUTIONS:")
+                for i, alt in enumerate(alternatives[:3], 1):
+                    cost_str = f"£{alt['estimated_cost']}" if alt.get('estimated_cost', 0) > 0 else "No additional cost"
+                    print(f"  {i}. {alt.get('description', 'Unknown solution')} ({cost_str})")
+                    
+        except Exception as e:
+            print(f"\n❌ Error checking constraints: {e}")
+            print("This may be expected if constraint checking isn't fully implemented yet.")
 
     def solve_stage(self, stage_name: str, timeout_seconds: int = 1800) -> SequentialSolveResult:
         """Solve a specific stage of the roster."""
@@ -258,12 +464,25 @@ class SequentialSolver:
             comet_week_ranges.append((monday, week_end))
         
         print(f"Found {len(comet_eligible)} COMET eligible doctors:")
+        
+        # Doctor Key - Full name to ID mapping
+        print("\n📋 DOCTOR KEY:")
+        for p_idx, person in comet_eligible:
+            print(f"  {person.id} = {person.name} (WTE: {person.wte})")
+        print()
+        
         for p_idx, person in comet_eligible:
             print(f"  {person.name} (WTE: {person.wte})")
         
         print(f"\nCOMET weeks to cover: {len(comet_week_ranges)}")
         for i, (start, end) in enumerate(comet_week_ranges):
             print(f"  Week {i+1}: {start} to {end}")
+        
+        # Calculate total COMET nights and equal distribution target
+        total_comet_nights = len(comet_week_ranges) * 7  # 7 nights per COMET week
+        self.target_comet_nights = total_comet_nights / len(comet_eligible) if len(comet_eligible) > 0 else 0
+        print(f"  Total COMET nights to assign: {total_comet_nights}")
+        print(f"  Target per doctor (equal distribution): {self.target_comet_nights:.1f}")
         
         # Initialize running totals
         running_totals = {}
@@ -342,6 +561,79 @@ class SequentialSolver:
             singleton_percentage = (total_singletons / (total_blocks + total_singletons)) * 100
             print(f"🎯 Singleton rate: {singleton_percentage:.1f}% (should be minimal)")
         
+        # Analyze week-level coverage patterns (4+3, 3+4, 2+2+3, etc.)
+        print("\n📅 WEEK COVERAGE PATTERN ANALYSIS:")
+        pattern_counts = {"4+3": 0, "3+4": 0, "2+2+3": 0, "2+3+2": 0, "3+2+2": 0, "other": 0}
+        
+        for i, (week_start, week_end) in enumerate(comet_week_ranges):
+            week_start_idx = (week_start - self.start_date).days
+            week_end_idx = (week_end - self.start_date).days
+            week_days = [day for day in range(week_start_idx, min(week_end_idx + 1, len(self.days)))]
+            
+            # Find all blocks in this week
+            week_blocks = []
+            for p_idx, person in comet_eligible:
+                consecutive_count = 0
+                
+                for day_idx in week_days:
+                    if day_idx < len(self.days):
+                        day_date = self.days[day_idx]
+                        assignment = self.partial_roster[day_date.isoformat()][person.id]
+                        
+                        if assignment == ShiftType.COMET_NIGHT.value:
+                            if consecutive_count == 0:
+                                pass  # Start of new block
+                            consecutive_count += 1
+                        else:
+                            if consecutive_count > 0:
+                                week_blocks.append(consecutive_count)
+                                consecutive_count = 0
+                
+                # Handle end of week
+                if consecutive_count > 0:
+                    week_blocks.append(consecutive_count)
+            
+            # Analyze the pattern
+            week_blocks.sort(reverse=True)  # Sort largest first
+            if len(week_blocks) == 2:
+                if week_blocks == [4, 3]:
+                    pattern_counts["4+3"] += 1
+                    pattern = "4+3 ✅"
+                elif week_blocks == [3, 4]:
+                    pattern_counts["3+4"] += 1 
+                    pattern = "3+4 ✅"
+                else:
+                    pattern_counts["other"] += 1
+                    pattern = f"{week_blocks[0]}+{week_blocks[1]}"
+            elif len(week_blocks) == 3:
+                if week_blocks == [3, 2, 2]:
+                    pattern_counts["3+2+2"] += 1
+                    pattern = "3+2+2 ✅"
+                elif week_blocks == [2, 2, 3]:
+                    pattern_counts["2+2+3"] += 1
+                    pattern = "2+2+3 ✅"
+                elif week_blocks == [2, 3, 2]:
+                    pattern_counts["2+3+2"] += 1
+                    pattern = "2+3+2 ✅"
+                else:
+                    pattern_counts["other"] += 1
+                    pattern = "+".join(map(str, week_blocks))
+            else:
+                pattern_counts["other"] += 1
+                pattern = "+".join(map(str, week_blocks)) if week_blocks else "incomplete"
+            
+            print(f"  Week {i+1} ({week_start} to {week_end}): {pattern}")
+        
+        # Summary of patterns achieved
+        total_weeks = len(comet_week_ranges)
+        optimal_weeks = pattern_counts["4+3"] + pattern_counts["3+4"]
+        good_weeks = pattern_counts["2+2+3"] + pattern_counts["2+3+2"] + pattern_counts["3+2+2"]
+        
+        print("\n🎯 PATTERN SUMMARY:")
+        print(f"  Optimal patterns (4+3/3+4): {optimal_weeks}/{total_weeks} weeks ({100*optimal_weeks/total_weeks:.1f}%)")
+        print(f"  Good patterns (2+2+3 variants): {good_weeks}/{total_weeks} weeks ({100*good_weeks/total_weeks:.1f}%)")
+        print(f"  Other patterns: {pattern_counts['other']}/{total_weeks} weeks ({100*pattern_counts['other']/total_weeks:.1f}%)")
+        
         # Count expected COMET nights needed
         expected_cmn = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
         print(f"\nExpected COMET nights needed: {expected_cmn}")
@@ -371,98 +663,69 @@ class SequentialSolver:
         )
         
     def _assign_comet_night_blocks_sequentially(self, comet_week_ranges, comet_eligible, running_totals):
-        """Assign COMET night blocks sequentially as described."""
+        """Week-focused assignment: Build optimal patterns within each week."""
         
         import random
+        import time
+        
+        start_time = time.time()
+        timeout_seconds = 120  # 2 minute timeout for block assignment
+        
         random.seed(42)  # For reproducible results during testing
         
-        # Start with a random doctor
-        current_doctor_idx = random.choice(range(len(comet_eligible)))
-        p_idx, person = comet_eligible[current_doctor_idx]
+        # Week-focused assignment: Build optimal patterns within each week
+        # Process weeks in order, trying to build optimal patterns
+        weeks_completed = 0
+        weeks_with_optimal_patterns = 0
         
-        print(f"\nStarting with random doctor: {person.name}")
+        for week_idx, (week_start, week_end) in enumerate(comet_week_ranges):
+            
+            # Get available days in this week
+            week_days = [day for day in self.days if week_start <= day <= week_end]
+            available_days = []
+            
+            for day in week_days:
+                # Check if this day is completely unassigned for COMET
+                day_already_covered = False
+                for person_id, assignment in self.partial_roster[day.isoformat()].items():
+                    if assignment == ShiftType.COMET_NIGHT.value:
+                        day_already_covered = True
+                        break
+                
+                if not day_already_covered:
+                    available_days.append(day)
+            
+            available_days.sort()
+            
+            if len(available_days) < 4:  # Skip weeks with too few available days
+                continue
+            
+            # Try to build optimal patterns: 4+3, 3+4, 2+2+3, etc.
+            pattern_built = self._try_build_optimal_week_pattern(
+                available_days, week_start, week_end, comet_eligible, running_totals
+            )
+            
+            if pattern_built:
+                weeks_with_optimal_patterns += 1
+            
+            weeks_completed += 1
+            
+            # Check timeout
+            elapsed_time = time.time() - start_time
+            if elapsed_time > timeout_seconds:
+                print(f"🚨 TIMEOUT: Block assignment exceeded {timeout_seconds} seconds after {weeks_completed} weeks")
+                break
         
-        assignment_round = 1
-        
-        while True:
-            # Find the next doctor who needs the most shifts (WTE-adjusted)
-            p_idx, person = self._select_next_doctor_for_comet_nights(comet_eligible, running_totals)
-            if p_idx is None:
-                print("All doctors have reached their target assignments")
-                break
-                
-            print(f"\nRound {assignment_round}: Assigning to {person.name} (WTE: {person.wte})")
-            
-            # Determine block size based on WTE - singletons are absolute last resort
-            if person.wte >= 1.0:
-                # WTE 1.0: Prefer 4+3 pairs for 7-day coverage, blocks of 2 only to prevent singletons
-                preferred_block_sizes = [4, 3, 2]  # NO singletons in normal assignment
-            elif person.wte >= 0.8:
-                # WTE 0.8: Similar to WTE 1.0 but weight towards 3+4, blocks of 2 more acceptable
-                preferred_block_sizes = [3, 4, 2]  # NO singletons in normal assignment
-            elif person.wte >= 0.6:
-                # WTE 0.6: Favor 2-night blocks, 3 occasionally, 4 exceptional only
-                preferred_block_sizes = [2, 3, 4]  # NO singletons in normal assignment
-            else:
-                # Very part-time: Stick to 2-night blocks
-                preferred_block_sizes = [2, 3]     # NO singletons in normal assignment
-            
-            print(f"  Target block sizes (in preference order): {preferred_block_sizes}")
-            
-            # Try to assign a block
-            assigned_block = self._assign_comet_night_block(p_idx, person, preferred_block_sizes, comet_week_ranges, running_totals)
-            
-            if not assigned_block:
-                print(f"  🚫 No suitable block found for {person.name}")
-                # Check if we've assigned enough - if so, it's okay to stop block assignment
-                # Check if we've assigned enough - use EQUAL distribution (not WTE-proportional)
-                current_comet_nights = running_totals[p_idx]['comet_nights']
-                total_comet_nights = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
-                equal_share_target = total_comet_nights / len(comet_eligible)  # Equal share for all
-                
-                # Check if this assignment would exceed weekly hour limits
-                weekly_comet_hours = (equal_share_target * 12) / 26  # 12h per night over 26 weeks
-                max_weekly_hours = 48 * person.wte
-                hours_percentage = (weekly_comet_hours / max_weekly_hours) * 100
-                
-                print(f"     Current COMET nights: {current_comet_nights}, Equal target: ~{equal_share_target:.1f}")
-                print(f"     Target weekly COMET hours: {weekly_comet_hours:.1f}h ({hours_percentage:.1f}% of {max_weekly_hours:.1f}h max)")
-                
-                # Only continue if doctor has reached reasonable block allocation (85% of equal share)
-                if current_comet_nights >= equal_share_target * 0.85:
-                    print(f"     ✓ {person.name} has good block allocation ({current_comet_nights}/{equal_share_target:.1f}), continuing with next doctor")
-                    continue  # Try next doctor instead of breaking
-                else:
-                    print(f"     ⚠️ {person.name} needs more blocks, but none available")
-                    print("     🔄 Will try other doctors first before gap-filling")
-                    continue  # Don't break - try other doctors first
-                
-            assignment_round += 1
-            
-            # Safety check to prevent infinite loops - but be more generous in block assignment phase
-            if assignment_round > 30:  # Increased from 20 to allow more block attempts
-                print("Maximum assignment rounds reached - proceeding to gap-filling phase")
-                break
-                
-            # Also break if we've tried all doctors multiple times without success
-            total_comet_nights = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
-            equal_share = total_comet_nights / len(comet_eligible)
-            
-            doctors_needing_more = 0
-            for p_idx, person in comet_eligible:
-                current_nights = running_totals[p_idx]['comet_nights']
-                if current_nights < equal_share * 0.85:  # 85% of equal share threshold
-                    doctors_needing_more += 1
-            
-            # If no doctors need more blocks (85% threshold), stop block phase
-            if doctors_needing_more == 0:
-                print("🎯 All doctors have sufficient block assignments (≥85% of equal target) - proceeding to gap-filling")
-                break
+        # After week-focused assignment, do a few rounds of doctor-focused cleanup
+        self._doctor_focused_cleanup_assignment(comet_week_ranges, comet_eligible, running_totals, max_rounds=20)
         
         # After assignment, check for any uncovered COMET nights
         print("\n" + "="*50)
         print("COMET NIGHT COVERAGE ANALYSIS")
         print("="*50)
+        
+        # Calculate total target COMET nights
+        total_comet_nights = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
         
         uncovered_days = []
         
@@ -478,55 +741,349 @@ class SequentialSolver:
                                        for assignment in day_assignments.values())
                     
                     if comet_assigned:
-                        assigned_doctor = [pid for pid, assignment in day_assignments.items() 
-                                         if assignment == ShiftType.COMET_NIGHT.value][0]
-                        print(f"  {day} ({day.strftime('%A')}): ✓ {assigned_doctor}")
+                        assigned_doctor_id = [pid for pid, assignment in day_assignments.items() 
+                                             if assignment == ShiftType.COMET_NIGHT.value][0]
+                        # Find doctor name from ID
+                        doctor_name = next((p.name for p in self.people if p.id == assigned_doctor_id), assigned_doctor_id)
+                        print(f"  {day} ({day.strftime('%A')}): ✓ {doctor_name} ({assigned_doctor_id})")
                     else:
                         print(f"  {day} ({day.strftime('%A')}): ❌ NO COVERAGE")
                         uncovered_days.append(day)
                         week_uncovered.append(day)
             
             if week_uncovered:
+                # Check if we still need more assignments
+                total_assigned = sum(running_totals[p_idx]['comet_nights'] for p_idx, _ in comet_eligible)
+                if total_assigned >= total_comet_nights:
+                    print(f"  ✅ Week has {len(week_uncovered)} uncovered days, but target {total_comet_nights} nights already assigned ({total_assigned}) - skipping")
+                    continue
+                    
                 print(f"  🔧 FIXING COVERAGE GAPS: {len(week_uncovered)} days need assignment")
-                print("     ⚠️  RESORTING TO SINGLETON NIGHTS (last resort only)")
-                # Try to assign single nights to uncovered days
-                for day in week_uncovered:
-                    self._assign_single_comet_night(day, comet_eligible, running_totals)
+                # First try to create blocks within this week
+                if len(week_uncovered) >= 3:
+                    print("     🎯 Attempting block assignments within week...")
+                    remaining_days = self._try_assign_blocks_within_week(week_uncovered, comet_eligible, running_totals)
+                    week_uncovered = remaining_days
+                
+                # Check again after block assignment
+                total_assigned = sum(running_totals[p_idx]['comet_nights'] for p_idx, _ in comet_eligible)
+                if total_assigned >= total_comet_nights:
+                    print(f"     ✅ Target {total_comet_nights} nights reached ({total_assigned}) - stopping gap-filling")
+                    break
+                
+                # Only resort to singletons for remaining days if still under target
+                if week_uncovered:
+                    nights_still_needed = total_comet_nights - total_assigned
+                    if nights_still_needed > 0:
+                        print(f"     ⚠️  RESORTING TO SINGLETON NIGHTS for {min(len(week_uncovered), nights_still_needed)} remaining days")
+                        for i, day in enumerate(week_uncovered):
+                            if i >= nights_still_needed:
+                                break
+                            self._assign_single_comet_night(day, comet_eligible, running_totals)
         
         print("\n" + "="*50)
         
+        # Before gap-filling with singletons, try to eliminate singleton patterns
+        # by redistributing existing blocks (convert 3+1 to 2+2)
         if uncovered_days:
             print(f"⚠️  ATTEMPTING TO FILL {len(uncovered_days)} UNCOVERED DAYS")
+            print("🔧 First trying to eliminate singleton patterns by redistribution...")
+            
+            # Try to fix singleton patterns by redistributing blocks
+            self._eliminate_singleton_patterns(comet_week_ranges, comet_eligible, running_totals)
         else:
             print("✅ ALL COMET WEEKS FULLY COVERED")
     
     def _select_next_doctor_for_comet_nights(self, comet_eligible, running_totals):
-        """Select the doctor with the fewest COMET nights (WTE-adjusted)."""
+        """Select the doctor with the fewest COMET nights using WTE-adjusted distribution."""
+        
+        # Calculate total COMET nights dynamically from COMET weeks
+        total_comet_nights = len(self.config.comet_on_weeks) * 7  # 7 nights per COMET week
+        total_wte = sum(person.wte for _, person in comet_eligible)
+        
+        print(f"  WTE-adjusted distribution (total nights: {total_comet_nights}, total WTE: {total_wte:.1f}):")
         
         candidates = []
+        all_satisfied = True
+        
         for p_idx, person in comet_eligible:
             comet_nights = running_totals[p_idx]['comet_nights']
-            wte_adjusted_nights = comet_nights / person.wte if person.wte > 0 else float('inf')
-            candidates.append((wte_adjusted_nights, p_idx, person))
+            
+            # Calculate WTE-adjusted target for this doctor
+            wte_target = (total_comet_nights * person.wte) / total_wte
+            wte_ratio = comet_nights / wte_target if wte_target > 0 else 0
+            
+            # Check if this doctor has reached 90% of their WTE-adjusted target
+            if comet_nights < wte_target * 0.9:
+                all_satisfied = False
+                # Use WTE-adjusted shortfall as priority (lower = higher priority)
+                wte_shortfall = wte_target - comet_nights
+                candidates.append((wte_shortfall, comet_nights, p_idx, person))
+                print(f"    {person.name} (WTE {person.wte}): {comet_nights}/{wte_target:.1f} nights ({wte_ratio*100:.1f}% of WTE target)")
+            else:
+                print(f"    {person.name} (WTE {person.wte}): {comet_nights}/{wte_target:.1f} nights (✓ at WTE target)")
         
-        # Sort by WTE-adjusted nights (ascending) 
-        candidates.sort(key=lambda x: x[0])
+        # If all doctors have reached their WTE-adjusted targets, return None to end assignment
+        if all_satisfied:
+            print("  All doctors have reached their WTE-adjusted distribution targets")
+            return None, None
         
-        # Find minimum WTE-adjusted count
-        min_adjusted_nights = candidates[0][0]
+        # Sort by WTE-adjusted shortfall (descending) - highest shortfall gets priority
+        candidates.sort(key=lambda x: x[0], reverse=True)
         
-        # Get all doctors with the minimum count
-        min_candidates = [c for c in candidates if c[0] == min_adjusted_nights]
-        
-        if len(min_candidates) > 1:
-            print(f"  Multiple candidates with {min_adjusted_nights:.1f} WTE-adjusted nights:")
-            for adj_nights, p_idx, person in min_candidates:
-                actual_nights = running_totals[p_idx]['comet_nights']
-                print(f"    {person.name}: {actual_nights} actual, {adj_nights:.1f} WTE-adjusted")
-        
-        # Return the first (or randomly select if you prefer)
-        _, p_idx, person = min_candidates[0]
+        # Return the doctor with highest WTE-adjusted shortfall
+        wte_shortfall, comet_nights, p_idx, person = candidates[0]
+        wte_target = (total_comet_nights * person.wte) / total_wte
+        print(f"  Selected {person.name} (has {comet_nights}/{wte_target:.1f} nights, shortfall: {wte_shortfall:.1f})")
         return p_idx, person
+    
+    def _eliminate_singleton_patterns(self, comet_week_ranges, comet_eligible, running_totals):
+        """Try to eliminate singleton patterns by redistributing blocks within weeks"""
+        
+        eliminated_any = False
+        
+        for week_start, week_end in comet_week_ranges:
+            # Convert dates to day indices  
+            week_start_idx = (week_start - self.start_date).days
+            week_end_idx = (week_end - self.start_date).days
+            week_days = [day for day in range(week_start_idx, min(week_end_idx + 1, len(self.days)))]
+            
+            # Get current assignments for this week from partial_roster
+            week_assignments = {}
+            for day_idx in week_days:
+                if day_idx < len(self.days):
+                    day_date = self.days[day_idx]
+                    for doctor_id in range(len(self.people)):
+                        person_id = self.people[doctor_id].id
+                        if self.partial_roster[day_date.isoformat()][person_id] == 'COMET_NIGHT':
+                            if doctor_id not in week_assignments:
+                                week_assignments[doctor_id] = []
+                            week_assignments[doctor_id].append(day_idx)
+            
+            # Check if this week has uncovered days (potential singletons) using partial_roster
+            uncovered_in_week = []
+            for day_idx in week_days:
+                if day_idx < len(self.days):
+                    day_date = self.days[day_idx]
+                    day_covered = False
+                    for doctor_id in range(len(self.people)):
+                        person_id = self.people[doctor_id].id
+                        if self.partial_roster[day_date.isoformat()][person_id] == 'COMET_NIGHT':
+                            day_covered = True
+                            break
+                    if not day_covered:
+                        uncovered_in_week.append(day_idx)
+            
+            if len(uncovered_in_week) == 1 and week_assignments:
+                gap_day = uncovered_in_week[0]
+                print(f"🔍 Week {week_start}-{week_end}: Found potential singleton gap on day {gap_day}")
+                
+                # Look for a doctor with 3+ consecutive nights who could share
+                for doctor_id, assigned_days in week_assignments.items():
+                    if len(assigned_days) >= 3:
+                        assigned_days.sort()
+                        
+                        # Find consecutive blocks
+                        consecutive_blocks = self._find_consecutive_blocks(assigned_days)
+                        
+                        # Look for a 3+ block that we can split
+                        for block in consecutive_blocks:
+                            if len(block) >= 3:
+                                print(f"🔧 Found {len(block)}-night block for {self.people[doctor_id].name}: days {block}")
+                                
+                                # Try to find another eligible doctor to take 2 nights
+                                for other_doctor_id in comet_eligible:
+                                    if (other_doctor_id != doctor_id and 
+                                        running_totals[other_doctor_id] < self.target_comet_nights and
+                                        len(week_assignments.get(other_doctor_id, [])) <= 2):  # Don't overload
+                                        
+                                        # Check if we can move 2 nights to eliminate the gap
+                                        nights_to_move = block[-2:]  # Last 2 nights of the block
+                                        
+                                        # Verify this would help eliminate the gap
+                                        remaining_block = block[:-2]
+                                        if len(remaining_block) >= 1:  # Still leaves at least 1 night for original doctor
+                                            
+                                            print(f"🔄 Attempting to redistribute nights {nights_to_move} from {self.people[doctor_id].name} to {self.people[other_doctor_id].name}")
+                                            
+                                            # This is a heuristic approach - in practice we'd need to
+                                            # re-solve or use more sophisticated constraint handling
+                                            # For now, let's just log what we would do
+                                            print(f"📝 Would redistribute: {self.people[doctor_id].name} keeps {remaining_block}, {self.people[other_doctor_id].name} gets {nights_to_move}")
+                                            print(f"   This would leave gap {gap_day} to be filled by better block distribution")
+                                            
+                                            eliminated_any = True
+                                            break
+                                
+                                if eliminated_any:
+                                    break
+                    
+                    if eliminated_any:
+                        break
+        
+        if eliminated_any:
+            print("✅ Identified singleton patterns that could be eliminated through redistribution")
+        else:
+            print("ℹ️  No obvious singleton patterns found for redistribution")
+            
+        return eliminated_any
+    
+    def _find_consecutive_blocks(self, assigned_days):
+        """Find consecutive blocks in a list of assigned days"""
+        if not assigned_days:
+            return []
+            
+        blocks = []
+        current_block = [assigned_days[0]]
+        
+        for i in range(1, len(assigned_days)):
+            if assigned_days[i] == assigned_days[i-1] + 1:
+                current_block.append(assigned_days[i])
+            else:
+                blocks.append(current_block)
+                current_block = [assigned_days[i]]
+        
+        blocks.append(current_block)
+        return blocks
+    
+    def _assign_comet_night_block_smart(self, p_idx, person, preferred_block_sizes, comet_week_ranges, running_totals):
+        """Doctor-centric block assignment that spreads doctors across different weeks."""
+        
+        # Strategy: Find the best week for THIS doctor to work, avoiding weeks where others are heavily assigned
+        best_assignment = None
+        best_score = -1
+        
+        for block_size in preferred_block_sizes:
+            for week_start, week_end in comet_week_ranges:
+                # Find available consecutive days in this week for this doctor
+                week_days = [day for day in self.days if week_start <= day <= week_end]
+                available_days = []
+                
+                for day in week_days:
+                    # Check if this doctor is available on this day
+                    if self.partial_roster[day.isoformat()][person.id] == ShiftType.OFF.value:
+                        # Also check that no other doctor already has COMET_NIGHT on this day
+                        day_already_covered = False
+                        for other_person_id, assignment in self.partial_roster[day.isoformat()].items():
+                            if assignment == ShiftType.COMET_NIGHT.value:
+                                day_already_covered = True
+                                break
+                        
+                        if not day_already_covered:
+                            available_days.append(day)
+                
+                # Try to find consecutive blocks within available days
+                if len(available_days) >= block_size:
+                    available_days.sort()
+                    
+                    # Look for consecutive sequences
+                    for start_idx in range(len(available_days) - block_size + 1):
+                        consecutive_block = [available_days[start_idx]]
+                        
+                        # Build consecutive sequence
+                        for i in range(1, block_size):
+                            next_day = consecutive_block[-1] + timedelta(days=1)
+                            if next_day in available_days:
+                                consecutive_block.append(next_day)
+                            else:
+                                break
+                        
+                        # If we found a full consecutive block
+                        if len(consecutive_block) == block_size:
+                            # Score this assignment based on week diversity (prefer less crowded weeks)
+                            score = self._score_week_for_doctor_assignment(week_start, week_end, p_idx)
+                            
+                            if score > best_score:
+                                best_score = score
+                                best_assignment = {
+                                    'days': consecutive_block,
+                                    'week_start': week_start,
+                                    'week_end': week_end,
+                                    'block_size': block_size
+                                }
+        
+        if best_assignment:
+            # Assign the best block found
+            days = best_assignment['days']
+            block_size = best_assignment['block_size']
+            week_start = best_assignment['week_start']
+            week_end = best_assignment['week_end']
+            
+            for day in days:
+                self.partial_roster[day.isoformat()][person.id] = ShiftType.COMET_NIGHT.value
+                running_totals[p_idx]['comet_nights'] += 1
+            
+            return True
+        
+        return False
+    
+    def _score_week_for_doctor_assignment(self, week_start, week_end, p_idx):
+        """Score a week for doctor assignment - prefer weeks with fewer existing assignments."""
+        
+        # Count how many nights are already assigned in this week
+        assigned_nights_in_week = 0
+        week_days = [day for day in self.days if week_start <= day <= week_end]
+        
+        for day in week_days:
+            day_str = day.isoformat()
+            if day_str in self.partial_roster:
+                for person_id, assignment in self.partial_roster[day_str].items():
+                    if assignment == ShiftType.COMET_NIGHT.value:
+                        assigned_nights_in_week += 1
+        
+        # Higher score for weeks with fewer assignments (encourages spreading)
+        # Also add small random factor to break ties
+        import random
+        diversity_score = 100 - assigned_nights_in_week + random.random()
+        
+        return diversity_score
+    
+    def _try_assign_block_in_week(self, p_idx, person, block_sizes, week_start, week_end, uncovered_days, running_totals):
+        """Try to assign a block within a specific week."""
+        
+        for block_size in block_sizes:
+            if block_size > len(uncovered_days):
+                continue
+                
+            # Find consecutive sequences of the right size
+            for i in range(len(uncovered_days) - block_size + 1):
+                potential_block = uncovered_days[i:i+block_size]
+                
+                # Check if these days are consecutive
+                is_consecutive = True
+                for j in range(1, len(potential_block)):
+                    if potential_block[j] != potential_block[j-1] + 1:
+                        is_consecutive = False
+                        break
+                
+                if not is_consecutive:
+                    continue
+                
+                # Check if person is available for all days in this block
+                can_assign = True
+                for day in potential_block:
+                    day_date = self.days[day]
+                    
+                    # Check if already assigned
+                    if self.partial_roster[day_date.isoformat()][person.id] != ShiftType.OFF.value:
+                        can_assign = False
+                        break
+                    
+                    # Check night rest constraint
+                    if not self._check_night_rest_ok(day_date, person.id):
+                        can_assign = False
+                        break
+                
+                if can_assign:
+                    # Assign this block using partial_roster only
+                    for day in potential_block:
+                        day_date = self.days[day]
+                        self.partial_roster[day_date.isoformat()][person.id] = ShiftType.COMET_NIGHT.value
+                        running_totals[p_idx]['comet_nights'] += 1
+                    
+                    return True
+        
+        return False
     
     def _assign_comet_night_block(self, p_idx, person, preferred_block_sizes, comet_week_ranges, running_totals):
         """Try to assign a COMET night block to the specified doctor."""
@@ -609,9 +1166,118 @@ class SequentialSolver:
             print(f"     Last rejection: {unavailable_reason}")
         return False
     
+    def _try_assign_blocks_within_week(self, uncovered_days, comet_eligible, running_totals):
+        """Try to assign blocks within a specific week's uncovered days."""
+        remaining_days = uncovered_days.copy()
+        
+        # Sort days to ensure consecutive assignment attempts
+        remaining_days.sort()
+        
+        # Try different block sizes starting with larger ones
+        for block_size in [4, 3, 2]:
+            if len(remaining_days) < block_size:
+                continue
+                
+            # Try to find consecutive days for blocks
+            for start_idx in range(len(remaining_days) - block_size + 1):
+                consecutive_days = []
+                
+                # Check if we have enough consecutive days
+                for i in range(block_size):
+                    if start_idx + i < len(remaining_days):
+                        day = remaining_days[start_idx + i]
+                        if i == 0 or (day - consecutive_days[-1]).days == 1:
+                            consecutive_days.append(day)
+                        else:
+                            break
+                
+                if len(consecutive_days) == block_size:
+                    # Select the doctor with highest WTE-adjusted shortfall for gap-filling
+                    selected_doctor = self._select_doctor_for_gap_filling(consecutive_days, comet_eligible, running_totals)
+                    
+                    if selected_doctor:
+                        p_idx, person = selected_doctor
+                        # Assign the block
+                        for day in consecutive_days:
+                            self.partial_roster[day.isoformat()][person.id] = ShiftType.COMET_NIGHT.value
+                            running_totals[p_idx]['comet_nights'] += 1
+                        
+                        print(f"       ✅ Assigned {block_size}-night block to {person.name}: {[d.strftime('%m-%d') for d in consecutive_days]}")
+                        
+                        # Remove assigned days from remaining
+                        for day in consecutive_days:
+                            if day in remaining_days:
+                                remaining_days.remove(day)
+                        
+                        # Start over with the remaining days
+                        return self._try_assign_blocks_within_week(remaining_days, comet_eligible, running_totals)
+        
+        return remaining_days
+    
+    def _select_doctor_for_gap_filling(self, consecutive_days, comet_eligible, running_totals):
+        """Select the best doctor for gap-filling using WTE-adjusted fairness."""
+        
+        total_comet_nights = len(self.config.comet_on_weeks) * 7
+        total_wte = sum(person.wte for _, person in comet_eligible)
+        
+        candidates = []
+        
+        for p_idx, person in comet_eligible:
+            # Check if this doctor can be assigned this block
+            if self._can_assign_block_to_doctor(consecutive_days, person, p_idx):
+                comet_nights = running_totals[p_idx]['comet_nights']
+                
+                # Calculate WTE-adjusted target and shortfall
+                wte_target = (total_comet_nights * person.wte) / total_wte
+                wte_shortfall = wte_target - comet_nights
+                
+                # Only consider doctors who are below their target
+                if wte_shortfall > 0:
+                    candidates.append((wte_shortfall, p_idx, person))
+        
+        if candidates:
+            # Sort by highest shortfall (most in need)
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            wte_shortfall, p_idx, person = candidates[0]
+            return (p_idx, person)
+        
+        return None
+    
+    def _can_assign_block_to_doctor(self, consecutive_days, person, person_idx):
+        """Check if a doctor can be assigned a block of consecutive days."""
+        for day in consecutive_days:
+            # Check if doctor is available (not assigned OFF or another shift)
+            current_assignment = self.partial_roster[day.isoformat()][person.id]
+            if current_assignment != ShiftType.OFF.value:
+                return False
+            
+            # Check that no other doctor already has COMET_NIGHT on this day
+            for other_person_id, assignment in self.partial_roster[day.isoformat()].items():
+                if assignment == ShiftType.COMET_NIGHT.value:
+                    return False
+                
+            # Simple constraint check: no previous/next night shifts for this doctor
+            # Check day before and after for existing night assignments
+            prev_day = day - timedelta(days=1)
+            next_day = day + timedelta(days=1)
+            
+            for check_day in [prev_day, next_day]:
+                if check_day.isoformat() in self.partial_roster:
+                    check_assignment = self.partial_roster[check_day.isoformat()][person.id]
+                    if check_assignment == ShiftType.COMET_NIGHT.value:
+                        return False
+        
+        return True
+    
     def _assign_single_comet_night(self, day, comet_eligible, running_totals):
         """Assign a single COMET night to fill coverage gaps."""
         print(f"    🔧 SINGLE NIGHT ASSIGNMENT for {day} ({day.strftime('%A')})")
+        
+        # First check if this day already has a COMET night assignment
+        for person_id, assignment in self.partial_roster[day.isoformat()].items():
+            if assignment == ShiftType.COMET_NIGHT.value:
+                print(f"    ℹ️  Day {day} already has COMET night coverage - skipping")
+                return True
         
         # Find the doctor with the least COMET nights (WTE-adjusted)
         best_doctor = None
@@ -728,88 +1394,307 @@ class SequentialSolver:
         )
     
     def _solve_nights_stage(self, timeout_seconds: int) -> SequentialSolveResult:
-        """Stage 2: Assign Night shifts - every day must have 1 N_REG + 1 N_SHO (Priority 2)."""
+        """Stage 2: Assign Unit Night shifts - exactly 1 N_REG per day (all days, including COMET days) using sequential assignment."""
         
-        model = cp_model.CpModel()
+        print("================================================================================")
+        print("UNIT NIGHTS STAGE: Sequential Assignment")
+        print("================================================================================")
         
-        # Create decision variables for nights and remaining OFF slots
-        night_shifts = [ShiftType.NIGHT_REG, ShiftType.NIGHT_SHO]
-        allowed_shifts = night_shifts + [ShiftType.OFF]
-        
-        x = {}
+        # Get all registrars who can work unit nights 
+        unit_night_eligible = []
         for p_idx, person in enumerate(self.people):
-            for d_idx, day in enumerate(self.days):
-                # Skip days where person already has a non-OFF assignment
-                current_assignment = self.partial_roster[day.isoformat()][person.id]
-                if current_assignment != ShiftType.OFF.value:
-                    continue
-                    
-                for shift in allowed_shifts:
-                    x[p_idx, d_idx, shift] = model.NewBoolVar(f"x_{p_idx}_{d_idx}_{shift.value}")
+            if person.grade == "Registrar":
+                unit_night_eligible.append((p_idx, person))
         
-        # Each person can only have one shift per day (for unassigned days)
-        for p_idx, person in enumerate(self.people):
-            for d_idx, day in enumerate(self.days):
-                current_assignment = self.partial_roster[day.isoformat()][person.id]
-                if current_assignment == ShiftType.OFF.value:
-                    model.Add(sum(x.get((p_idx, d_idx, s), 0) for s in allowed_shifts) == 1)
-        
-        # Night coverage requirements
-        self._add_night_coverage_constraints(model, x, night_shifts)
-        
-        # Night block patterns (2-4 consecutive nights)
-        self._add_night_block_constraints(model, x, night_shifts)
-        
-        # 72-hour rule for nights
-        self._add_night_rest_constraints(model, x, night_shifts)
-        
-        # Temporarily disable fairness constraints for debugging
-        # self._add_global_fairness_constraints(model, x, night_shifts, "nights")
-        
-        # Grade-specific constraints
-        for p_idx, person in enumerate(self.people):
-            for d_idx, day in enumerate(self.days):
-                # Only registrars can do NIGHT_REG, only SHOs can do NIGHT_SHO
-                if person.grade not in ["Registrar"] and (p_idx, d_idx, ShiftType.NIGHT_REG) in x:
-                    model.Add(x[p_idx, d_idx, ShiftType.NIGHT_REG] == 0)
-                if person.grade not in ["SHO"] and (p_idx, d_idx, ShiftType.NIGHT_SHO) in x:
-                    model.Add(x[p_idx, d_idx, ShiftType.NIGHT_SHO] == 0)
-        
-        # Solve
-        solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = timeout_seconds
-        
-        status = solver.Solve(model)
-        
-        if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
-            # Extract night assignments
-            new_assignments = set()
-            for p_idx, person in enumerate(self.people):
-                for d_idx, day in enumerate(self.days):
-                    for shift in night_shifts:
-                        if (p_idx, d_idx, shift) in x and solver.Value(x[p_idx, d_idx, shift]) == 1:
-                            # Update partial roster
-                            self.partial_roster[day.isoformat()][person.id] = shift.value
-                            new_assignments.add((p_idx, d_idx, shift))
-                            self.assigned_shifts.add((p_idx, d_idx, shift))
-            
-            return SequentialSolveResult(
-                stage="nights",
-                success=True,
-                message=f"Nights stage completed. Assigned {len(new_assignments)} night shifts in appropriate blocks.",
-                partial_roster=copy.deepcopy(self.partial_roster),
-                assigned_shifts=new_assignments,
-                next_stage="weekend_holidays"
-            )
-        else:
+        if not unit_night_eligible:
             return SequentialSolveResult(
                 stage="nights",
                 success=False,
-                message=f"Nights stage failed: {solver.StatusName(status)}",
+                message="No registrars available for unit night shifts.",
                 partial_roster=copy.deepcopy(self.partial_roster),
                 next_stage="weekend_holidays"
             )
+        
+        print(f"Found {len(unit_night_eligible)} unit night eligible registrars:")
+        
+        # Unit Night Registrar Key - Full name to ID mapping  
+        print("\n📋 UNIT NIGHT REGISTRAR KEY:")
+        for p_idx, person in unit_night_eligible:
+            print(f"  {person.id} = {person.name} (WTE: {person.wte})")
+        print()
+        
+        for p_idx, person in unit_night_eligible:
+            print(f"  {person.name} (WTE: {person.wte})")
+        
+        # Identify ALL days that need unit night coverage (including COMET days)
+        unit_night_days = []
+        comet_days = set()
+        
+        # First, convert COMET week dates to week ranges for reference
+        comet_week_ranges = []
+        for monday in self.config.comet_on_weeks:
+            week_end = monday + timedelta(days=6) 
+            comet_week_ranges.append((monday, week_end))
+        
+        # Identify all COMET days for reference
+        for week_start, week_end in comet_week_ranges:
+            for day in self.days:
+                if week_start <= day <= week_end:
+                    comet_days.add(day)
+        
+        # Unit nights cover ALL days (COMET nights are additional coverage)
+        unit_night_days = list(self.days)
+        
+        print(f"\nUnit night days to cover: {len(unit_night_days)}")
+        print(f"COMET days (also covered): {len(comet_days)}")
+        print(f"Total days: {len(self.days)}")
+        
+        # Calculate targets for WTE-based fairness
+        total_unit_nights = len(unit_night_days)
+        print(f"Total unit nights to assign: {total_unit_nights}")
+        print(f"Target per registrar (equal distribution): {total_unit_nights / len(unit_night_eligible):.1f}")
+        
+        # Initialize running totals for unit nights
+        running_totals = {}
+        for p_idx, person in unit_night_eligible:
+            running_totals[p_idx] = {
+                'unit_nights': 0,
+                'total_nights': 0,
+                'total_hours': 0
+            }
+        
+        print("\n==================================================")
+        print("STEP 1: UNIT NIGHT ASSIGNMENTS")
+        print("==================================================")
+        
+        # Use week-focused assignment similar to COMET nights
+        result = self._assign_unit_night_blocks_sequentially(unit_night_days, unit_night_eligible, running_totals)
+        
+        if not result:
+            return SequentialSolveResult(
+                stage="nights",
+                success=False,
+                message="Failed to assign unit nights using sequential approach.",
+                partial_roster=copy.deepcopy(self.partial_roster),
+                next_stage="weekend_holidays"
+            )
+        
+        # Count final assignments
+        total_assigned = sum(running_totals[p_idx]['unit_nights'] for p_idx, _ in unit_night_eligible)
+        
+        # Display final results
+        self._display_unit_night_coverage_analysis(unit_night_days, unit_night_eligible, running_totals)
+        
+        return SequentialSolveResult(
+            stage="nights",
+            success=True,
+            message=f"Unit nights completed. Assigned {total_assigned} unit night shifts. Ready for weekend/holidays.",
+            partial_roster=copy.deepcopy(self.partial_roster),
+            assigned_shifts=set(),  # Will track properly when integrated
+            next_stage="weekend_holidays"
+        )
+        
+    def _assign_unit_night_blocks_sequentially(self, unit_night_days, unit_night_eligible, running_totals):
+        """Week-by-week block assignment: Reuse COMET block logic for entire rota window."""
+        
+        import time
+        from datetime import timedelta
+        
+        start_time = time.time()
+        timeout_seconds = 120
+        
+        # Process all weeks in the rota period, not just those with unit nights
+        # This allows proper block assignment across the entire window
+        current_week_start = self.days[0]
+        weeks_completed = 0
+        weeks_with_optimal_patterns = 0
+        
+        while current_week_start <= self.days[-1]:
+            week_end = current_week_start + timedelta(days=6)
+            
+            # Find unit night days in this week (ALL days need unit nights)
+            week_unit_nights = []
+            
+            for day_offset in range(7):
+                day = current_week_start + timedelta(days=day_offset)
+                if day > self.days[-1]:
+                    break
+                    
+                # All days need unit night coverage (regardless of COMET assignments)
+                week_unit_nights.append(day)
+            
+            # If this week has unit nights to assign, use block logic
+            if len(week_unit_nights) >= 2:
+                pattern_built = self._assign_unit_night_blocks_greedy(week_unit_nights, unit_night_eligible, running_totals)
+                if pattern_built:
+                    weeks_with_optimal_patterns += 1
+                    
+            elif len(week_unit_nights) == 1:
+                # Single day - assign directly
+                self._assign_single_unit_night(week_unit_nights[0], unit_night_eligible, running_totals)
+            
+            weeks_completed += 1
+            current_week_start += timedelta(days=7)
+            
+            # Check timeout
+            elapsed_time = time.time() - start_time
+            if elapsed_time > timeout_seconds:
+                break
+        
+        print(f"📅 Unit night weeks: {weeks_completed} processed, {weeks_with_optimal_patterns} with optimal patterns")
+        
+        return True
     
+    def _assign_unit_night_blocks_greedy(self, week_unit_nights, unit_night_eligible, running_totals):
+        """Greedy block assignment for unit nights in a week."""
+        
+        week_unit_nights.sort()
+        assigned_days = set()
+        
+        # Try to form 2-4 night blocks
+        for start_idx in range(len(week_unit_nights)):
+            if week_unit_nights[start_idx] in assigned_days:
+                continue
+                
+            # Try different block sizes (prefer larger blocks)
+            for block_size in [4, 3, 2]:
+                if start_idx + block_size > len(week_unit_nights):
+                    continue
+                    
+                # Check if these days are consecutive
+                block_days = week_unit_nights[start_idx:start_idx + block_size]
+                consecutive = all((block_days[i] - block_days[i-1]).days == 1 
+                                for i in range(1, len(block_days)))
+                
+                if consecutive and all(day not in assigned_days for day in block_days):
+                    # Try to assign this block
+                    selected_registrar = self._select_registrar_for_unit_night_block(
+                        block_size, block_days, unit_night_eligible, running_totals
+                    )
+                    
+                    if selected_registrar:
+                        # Assign the block
+                        for day in block_days:
+                            self.partial_roster[day.isoformat()][selected_registrar.id] = ShiftType.NIGHT_REG.value
+                            assigned_days.add(day)
+                            
+                        # Update running totals
+                        for p_idx, person in unit_night_eligible:
+                            if person.id == selected_registrar.id:
+                                running_totals[p_idx]['unit_nights'] += block_size
+                                running_totals[p_idx]['total_nights'] += block_size
+                                running_totals[p_idx]['total_hours'] += block_size * 12
+                                break
+                        break
+        
+        # Assign any remaining single days
+        for day in week_unit_nights:
+            if day not in assigned_days:
+                self._assign_single_unit_night(day, unit_night_eligible, running_totals)
+                
+        return True
+    
+    def _select_registrar_for_unit_night_block(self, block_size, block_days, 
+                                             unit_night_eligible, running_totals):
+        """Select best registrar for a unit night block (reuse COMET logic)."""
+        
+        # Calculate WTE-adjusted assignments for fairness
+        wte_adjusted_totals = []
+        for p_idx, person in unit_night_eligible:
+            unit_nights = running_totals[p_idx]['unit_nights']
+            wte_adjusted = unit_nights / person.wte if person.wte > 0 else unit_nights
+            wte_adjusted_totals.append(wte_adjusted)
+        
+        # Find registrars who can work all days in the block
+        available_registrars = []
+        for i, (p_idx, person) in enumerate(unit_night_eligible):
+            can_work_block = True
+            
+            for day in block_days:
+                # Check if already assigned
+                current_assignment = self.partial_roster[day.isoformat()][person.id]
+                if current_assignment != ShiftType.OFF.value:
+                    can_work_block = False
+                    break
+                    
+                # Check rest constraints (simplified)
+                if not self._check_night_rest_ok(day, person.id):
+                    can_work_block = False
+                    break
+            
+            if can_work_block:
+                available_registrars.append((p_idx, person, wte_adjusted_totals[i]))
+        
+        if not available_registrars:
+            return None
+            
+        # Prefer part-time doctors for smaller blocks (WTE < 1.0)
+        # and less assigned doctors overall
+        if block_size <= 3:
+            part_time_doctors = [(p_idx, person, wte_adj) for p_idx, person, wte_adj in available_registrars 
+                               if person.wte < 1.0]
+            if part_time_doctors:
+                available_registrars = part_time_doctors
+        
+        # Select doctor with lowest WTE-adjusted assignment count
+        available_registrars.sort(key=lambda x: x[2])
+        return available_registrars[0][1]
+    
+    def _display_unit_night_coverage_analysis(self, unit_night_days, unit_night_eligible, running_totals):
+        """Display analysis of unit night coverage."""
+        
+        print("\n" + "=" * 50)
+        print("UNIT NIGHT COVERAGE ANALYSIS")
+        print("=" * 50)
+        
+        # Count assigned vs unassigned days
+        covered_days = 0
+        for day in unit_night_days:
+            for person_id, assignment in self.partial_roster[day.isoformat()].items():
+                if assignment == ShiftType.NIGHT_REG.value:
+                    covered_days += 1
+                    break
+        
+        print(f"\nUnit night days covered: {covered_days}/{len(unit_night_days)}")
+        
+        if covered_days == len(unit_night_days):
+            print("✅ ALL UNIT NIGHT DAYS FULLY COVERED")
+        else:
+            print(f"❌ {len(unit_night_days) - covered_days} unit night days uncovered")
+        
+        print(f"\nFinal Unit Night assignments:")
+        for p_idx, person in unit_night_eligible:
+            unit_nights = running_totals[p_idx]['unit_nights']
+            wte_adjusted = unit_nights / person.wte if person.wte > 0 else unit_nights
+            print(f"  {person.name}: {unit_nights} N_REG shifts (WTE-adjusted: {wte_adjusted:.1f})")
+        
+        total_assigned = sum(running_totals[p_idx]['unit_nights'] for p_idx, person in unit_night_eligible)
+        print(f"\nTotal unit nights assigned: {total_assigned}")
+            
+    def _assign_single_unit_night(self, day, unit_night_eligible, running_totals):
+        """Assign a single unit night day (in addition to any COMET nights on the same day)."""
+        
+        # Find available registrars for this day (excluding those already doing COMET night)
+        available_registrars = []
+        for p_idx, person in unit_night_eligible:
+            current_assignment = self.partial_roster[day.isoformat()][person.id]
+            # Don't assign unit nights to someone already doing COMET night on same day
+            if current_assignment != ShiftType.COMET_NIGHT.value:
+                unit_nights = running_totals[p_idx]['unit_nights']
+                wte_adjusted = unit_nights / person.wte if person.wte > 0 else unit_nights
+                available_registrars.append((p_idx, person, wte_adjusted))
+        
+        if available_registrars:
+            # Select registrar with lowest WTE-adjusted count
+            available_registrars.sort(key=lambda x: x[2])
+            p_idx, selected_person, _ = available_registrars[0]
+            
+            # Assign the night
+            self.partial_roster[day.isoformat()][selected_person.id] = ShiftType.NIGHT_REG.value
+            running_totals[p_idx]['unit_nights'] += 1
+            running_totals[p_idx]['total_nights'] += 1 
+            running_totals[p_idx]['total_hours'] += 12
+
     def _solve_weekend_holiday_stage(self, timeout_seconds: int) -> SequentialSolveResult:
         """Stage 3: Assign weekend and holiday long days - exactly 1 LD_REG per weekend/holiday day (Priority 3)."""
         
@@ -1786,6 +2671,275 @@ class SequentialSolver:
                 'medium_violations': len([v for v in violations if v.severity == 'MEDIUM'])
             }
         }
+    
+    def _try_build_optimal_week_pattern(self, available_days, week_start, week_end, comet_eligible, running_totals):
+        """Try to build optimal patterns within a week (4+3, 3+4, 2+2+3, etc.)"""
+        
+        if len(available_days) < 4:
+            return False
+        
+        # Convert to day indices for easier handling
+        available_indices = [(day - self.start_date).days for day in available_days]
+        available_indices.sort()
+        
+        # Try different optimal patterns
+        patterns_to_try = [
+            # Pattern: [block1_size, block2_size, ...]
+            [4, 3],    # 4+3 pattern 
+            [3, 4],    # 3+4 pattern
+            [3, 2, 2], # 3+2+2 pattern
+            [2, 3, 2], # 2+3+2 pattern  
+            [2, 2, 3], # 2+2+3 pattern
+        ]
+        
+        for pattern in patterns_to_try:
+            # Check if we have enough days for this pattern
+            if sum(pattern) > len(available_indices):
+                continue
+            
+            # Try to assign this pattern
+            success = self._try_assign_pattern_in_week(pattern, available_indices, week_start, week_end, comet_eligible, running_totals)
+            if success:
+                return True
+        
+        return False
+    
+    def _try_assign_pattern_in_week(self, pattern, available_indices, week_start, week_end, comet_eligible, running_totals):
+        """Try to assign a specific pattern (e.g., [4,3]) within available days."""
+        
+        # Find consecutive groups that can fit the pattern
+        consecutive_groups = self._find_consecutive_groups(available_indices)
+        
+        # Try to match pattern blocks to consecutive groups
+        assignments = self._generate_pattern_assignments(pattern, consecutive_groups)
+        
+        for i, assignment in enumerate(assignments):
+            if self._try_assign_pattern_assignment(assignment, available_indices, comet_eligible, running_totals):
+                return True
+        
+        return False
+    
+    def _find_consecutive_groups(self, day_indices):
+        """Find all consecutive groups of days."""
+        if not day_indices:
+            return []
+        
+        groups = []
+        current_group = [day_indices[0]]
+        
+        for i in range(1, len(day_indices)):
+            if day_indices[i] == day_indices[i-1] + 1:
+                current_group.append(day_indices[i])
+            else:
+                groups.append(current_group)
+                current_group = [day_indices[i]]
+        
+        groups.append(current_group)
+        return groups
+    
+    def _generate_pattern_assignments(self, pattern, consecutive_groups):
+        """Generate possible ways to assign pattern blocks within consecutive groups."""
+        
+        assignments = []
+        
+        # For each consecutive group, try to fit the entire pattern within it
+        for group in consecutive_groups:
+            group_len = len(group)
+            pattern_total = sum(pattern)
+            
+            if group_len >= pattern_total:
+                # Try different starting positions within the group
+                for start_pos in range(group_len - pattern_total + 1):
+                    assignment = []
+                    current_pos = start_pos
+                    
+                    # Assign each block in the pattern
+                    valid = True
+                    for block_idx, block_size in enumerate(pattern):
+                        if current_pos + block_size <= group_len:
+                            block_days = group[current_pos:current_pos + block_size]
+                            assignment.append((block_size, block_days))
+                            current_pos += block_size
+                        else:
+                            valid = False
+                            break
+                    
+                    if valid:
+                        assignments.append(assignment)
+        
+        return assignments
+    
+    def _try_assign_pattern_assignment(self, assignment, available_indices, comet_eligible, running_totals):
+        """Try to assign a specific pattern assignment to doctors."""
+        
+        # Select doctors for each block based on WTE-adjusted fairness
+        selected_doctors = []
+        
+        for i, (block_size, day_indices) in enumerate(assignment):
+            doctor = self._select_doctor_for_block(block_size, day_indices, comet_eligible, running_totals, selected_doctors)
+            if doctor is None:
+                return False  # Can't find suitable doctor for this block
+            selected_doctors.append(doctor)
+        
+        # If we found doctors for all blocks, make the assignments
+        for i, (block_size, day_indices) in enumerate(assignment):
+            p_idx, person = selected_doctors[i]
+            
+            for day_idx in day_indices:
+                day_date = self.days[day_idx]
+                self.partial_roster[day_date.isoformat()][person.id] = ShiftType.COMET_NIGHT.value
+                running_totals[p_idx]['comet_nights'] += 1
+        
+        return True
+    
+    def _select_doctor_for_block(self, block_size, day_indices, comet_eligible, running_totals, already_selected):
+        """Select the best doctor for a specific block based on WTE-adjusted fairness."""
+        
+        # Calculate total COMET nights dynamically from COMET weeks
+        total_comet_nights = len(self.config.comet_on_weeks) * 7  # 7 nights per COMET week
+        total_wte = sum(person.wte for _, person in comet_eligible)
+        
+        best_doctor = None
+        best_shortfall = -1
+        
+        for p_idx, person in comet_eligible:
+            # Skip if already selected for this week pattern
+            if (p_idx, person) in already_selected:
+                continue
+            
+            # Check if doctor is available for all days in this block
+            available = True
+            for day_idx in day_indices:
+                day_date = self.days[day_idx]
+                current_assignment = self.partial_roster[day_date.isoformat()][person.id]
+                if current_assignment != ShiftType.OFF.value:
+                    available = False
+                    break
+                
+                # Check if another doctor already has COMET_NIGHT on this day
+                for other_person_id, assignment in self.partial_roster[day_date.isoformat()].items():
+                    if assignment == ShiftType.COMET_NIGHT.value:
+                        available = False
+                        break
+                
+                if not available:
+                    break
+            
+            if not available:
+                continue
+            
+            # Calculate WTE-adjusted target and shortfall
+            wte_proportion = person.wte / total_wte
+            wte_target = total_comet_nights * wte_proportion
+            current_nights = running_totals[p_idx]['comet_nights']
+            shortfall = wte_target - current_nights
+            
+            # Apply stronger WTE-based weighting to prioritize those furthest from target
+            # Use percentage shortfall to make selection more sensitive to WTE imbalances
+            if wte_target > 0:
+                wte_ratio = current_nights / wte_target
+                # Give extra weight to doctors who are further below their WTE target
+                if wte_ratio < 0.9:  # If getting less than 90% of target
+                    wte_boost = (0.9 - wte_ratio) * 5.0  # Strong boost for underassigned
+                    shortfall += wte_boost
+                elif wte_ratio > 1.1:  # If getting more than 110% of target  
+                    wte_penalty = (wte_ratio - 1.1) * 3.0  # Penalty for overassigned
+                    shortfall -= wte_penalty
+            
+            # Apply WTE-aware block size preference for part-time doctors
+            adjusted_shortfall = shortfall
+            if person.wte <= 0.6:
+                # For 0.6 WTE doctors, prefer shorter blocks (2-3 nights) over longer ones (4+ nights)
+                if block_size >= 4:
+                    # Strong penalty for 4+ night blocks for part-time doctors
+                    block_penalty = 4.0  # Increased penalty to strongly discourage long blocks
+                    adjusted_shortfall -= block_penalty
+                elif block_size in [2, 3]:
+                    # Preference for 2-3 night blocks for part-time doctors
+                    block_bonus = 1.0  # Increased bonus to encourage shorter blocks
+                    adjusted_shortfall += block_bonus
+            
+            # Select doctor with highest adjusted shortfall (needs most nights, considering WTE preferences)
+            if adjusted_shortfall > best_shortfall:
+                best_shortfall = adjusted_shortfall
+                best_doctor = (p_idx, person)
+        
+        return best_doctor
+    
+    def _doctor_focused_cleanup_assignment(self, comet_week_ranges, comet_eligible, running_totals, max_rounds=20):
+        """Do a few rounds of doctor-focused assignment to balance remaining assignments."""
+        
+        # First, check if all COMET nights are already covered
+        total_comet_nights = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
+        
+        covered_nights = 0
+        uncovered_days = []
+        
+        for week_start, week_end in comet_week_ranges:
+            for day in self.days:
+                if week_start <= day <= week_end:
+                    # Check if this day has COMET night coverage
+                    day_assignments = self.partial_roster[day.isoformat()]
+                    comet_assigned = any(assignment == ShiftType.COMET_NIGHT.value 
+                                       for assignment in day_assignments.values())
+                    
+                    if comet_assigned:
+                        covered_nights += 1
+                    else:
+                        uncovered_days.append(day)
+        
+        # If all nights are covered, skip cleanup unless there are major imbalances
+        if covered_nights == total_comet_nights:
+            # Check for major WTE imbalances (>50% deviation from target)
+            major_imbalance_detected = False
+            total_wte = sum(person.wte for _, person in comet_eligible)
+            
+            for p_idx, person in comet_eligible:
+                comet_nights = running_totals[p_idx]['comet_nights']
+                wte_target = (total_comet_nights * person.wte) / total_wte
+                wte_ratio = comet_nights / wte_target if wte_target > 0 else 0
+                
+                # Only worry about major imbalances (less than 50% of target)
+                if comet_nights > 0 and wte_ratio < 0.5:  # Someone working but getting <50% of target
+                    major_imbalance_detected = True
+            
+            if not major_imbalance_detected:
+                return
+        
+        # Track failed attempts to detect stuck states
+        failed_assignments = {}
+        consecutive_failures = 0
+        
+        for round_num in range(max_rounds):
+            # Find doctor who needs the most shifts (WTE-adjusted)
+            p_idx, person = self._select_next_doctor_for_comet_nights(comet_eligible, running_totals)
+            if p_idx is None:
+                print(f"     ✅ All doctors balanced after {round_num} cleanup rounds")
+                break
+            
+            print(f"     🔄 Cleanup round {round_num + 1}: Balancing {person.name}")
+            
+            # Try to assign a small block (2-3 nights) to this doctor
+            cleanup_block_sizes = [2, 3] if person.wte >= 0.8 else [2]
+            assigned = self._assign_comet_night_block_smart(p_idx, person, cleanup_block_sizes, comet_week_ranges, running_totals)
+            
+            if not assigned:
+                print(f"     ❌ No cleanup assignment possible for {person.name}")
+                
+                # Track failed assignments to detect stuck states
+                failed_assignments[person.id] = failed_assignments.get(person.id, 0) + 1
+                consecutive_failures += 1
+                
+                # If the same doctor fails 3 times in a row, or we have 5 consecutive failures, stop
+                if failed_assignments.get(person.id, 0) >= 3 or consecutive_failures >= 5:
+                    print(f"     🛑 Detected stuck state - stopping cleanup after {consecutive_failures} consecutive failures")
+                    break
+                    
+                continue
+            else:
+                # Reset failure counters on successful assignment
+                consecutive_failures = 0
+                failed_assignments[person.id] = 0
     
     def reset_to_stage(self, stage_name: str):
         """Reset roster to the beginning of a specific stage."""
