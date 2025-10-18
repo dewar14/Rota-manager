@@ -415,18 +415,21 @@ class SequentialSolver:
             if not assigned_block:
                 print(f"  🚫 No suitable block found for {person.name}")
                 # Check if we've assigned enough - if so, it's okay to stop block assignment
+                # Check if we've assigned enough - calculate proper target
                 current_comet_nights = running_totals[p_idx]['comet_nights']
-                expected_nights = int(7 * person.wte)  # Rough target
-                print(f"     Current COMET nights: {current_comet_nights}, Target: ~{expected_nights}")
+                total_comet_nights = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
+                fair_share = total_comet_nights / len(comet_eligible)  # Equal distribution base
+                wte_adjusted_target = fair_share * person.wte  # Adjust for WTE
                 
-                # Be more lenient about stopping block assignment - singletons will fill gaps later
-                if current_comet_nights >= expected_nights * 0.7:  # 70% of target is sufficient for block phase
-                    print(f"     ✓ {person.name} has reasonable assignments ({current_comet_nights}), continuing with next doctor")
-                    print("     💡 Any remaining needs will be filled by gap-filling singletons later")
+                print(f"     Current COMET nights: {current_comet_nights}, WTE-adjusted target: ~{wte_adjusted_target:.1f}")
+                
+                # Only continue if doctor has reached reasonable block allocation (85% of target)
+                if current_comet_nights >= wte_adjusted_target * 0.85:
+                    print(f"     ✓ {person.name} has good block allocation ({current_comet_nights}/{wte_adjusted_target:.1f}), continuing with next doctor")
                     continue  # Try next doctor instead of breaking
                 else:
-                    print(f"     ⚠️ {person.name} needs more assignments, but no blocks available")
-                    print("     🔄 Will try other doctors and fill gaps with singletons later")
+                    print(f"     ⚠️ {person.name} needs more blocks, but none available")
+                    print("     🔄 Will try other doctors first before gap-filling")
                     continue  # Don't break - try other doctors first
                 
             assignment_round += 1
@@ -437,16 +440,19 @@ class SequentialSolver:
                 break
                 
             # Also break if we've tried all doctors multiple times without success
-            unsuccessful_attempts = 0
+            total_comet_nights = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
+            fair_share = total_comet_nights / len(comet_eligible)
+            
+            doctors_needing_more = 0
             for p_idx, person in comet_eligible:
                 current_nights = running_totals[p_idx]['comet_nights']
-                expected_nights = int(7 * person.wte)
-                if current_nights < expected_nights * 0.7:
-                    unsuccessful_attempts += 1
+                wte_adjusted_target = fair_share * person.wte
+                if current_nights < wte_adjusted_target * 0.85:  # 85% threshold
+                    doctors_needing_more += 1
             
-            # If most doctors still need assignments but we're not making progress, stop block phase
-            if unsuccessful_attempts == 0:
-                print("🎯 All doctors have sufficient block assignments - proceeding to gap-filling")
+            # If no doctors need more blocks (85% threshold), stop block phase
+            if doctors_needing_more == 0:
+                print("🎯 All doctors have sufficient block assignments (≥85% of target) - proceeding to gap-filling")
                 break
         
         # After assignment, check for any uncovered COMET nights
