@@ -415,17 +415,22 @@ class SequentialSolver:
             if not assigned_block:
                 print(f"  🚫 No suitable block found for {person.name}")
                 # Check if we've assigned enough - if so, it's okay to stop block assignment
-                # Check if we've assigned enough - calculate proper target
+                # Check if we've assigned enough - use EQUAL distribution (not WTE-proportional)
                 current_comet_nights = running_totals[p_idx]['comet_nights']
                 total_comet_nights = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
-                fair_share = total_comet_nights / len(comet_eligible)  # Equal distribution base
-                wte_adjusted_target = fair_share * person.wte  # Adjust for WTE
+                equal_share_target = total_comet_nights / len(comet_eligible)  # Equal share for all
                 
-                print(f"     Current COMET nights: {current_comet_nights}, WTE-adjusted target: ~{wte_adjusted_target:.1f}")
+                # Check if this assignment would exceed weekly hour limits
+                weekly_comet_hours = (equal_share_target * 12) / 26  # 12h per night over 26 weeks
+                max_weekly_hours = 48 * person.wte
+                hours_percentage = (weekly_comet_hours / max_weekly_hours) * 100
                 
-                # Only continue if doctor has reached reasonable block allocation (85% of target)
-                if current_comet_nights >= wte_adjusted_target * 0.85:
-                    print(f"     ✓ {person.name} has good block allocation ({current_comet_nights}/{wte_adjusted_target:.1f}), continuing with next doctor")
+                print(f"     Current COMET nights: {current_comet_nights}, Equal target: ~{equal_share_target:.1f}")
+                print(f"     Target weekly COMET hours: {weekly_comet_hours:.1f}h ({hours_percentage:.1f}% of {max_weekly_hours:.1f}h max)")
+                
+                # Only continue if doctor has reached reasonable block allocation (85% of equal share)
+                if current_comet_nights >= equal_share_target * 0.85:
+                    print(f"     ✓ {person.name} has good block allocation ({current_comet_nights}/{equal_share_target:.1f}), continuing with next doctor")
                     continue  # Try next doctor instead of breaking
                 else:
                     print(f"     ⚠️ {person.name} needs more blocks, but none available")
@@ -441,18 +446,17 @@ class SequentialSolver:
                 
             # Also break if we've tried all doctors multiple times without success
             total_comet_nights = len([d for d in self.days if any(start <= d <= end for start, end in comet_week_ranges)])
-            fair_share = total_comet_nights / len(comet_eligible)
+            equal_share = total_comet_nights / len(comet_eligible)
             
             doctors_needing_more = 0
             for p_idx, person in comet_eligible:
                 current_nights = running_totals[p_idx]['comet_nights']
-                wte_adjusted_target = fair_share * person.wte
-                if current_nights < wte_adjusted_target * 0.85:  # 85% threshold
+                if current_nights < equal_share * 0.85:  # 85% of equal share threshold
                     doctors_needing_more += 1
             
             # If no doctors need more blocks (85% threshold), stop block phase
             if doctors_needing_more == 0:
-                print("🎯 All doctors have sufficient block assignments (≥85% of target) - proceeding to gap-filling")
+                print("🎯 All doctors have sufficient block assignments (≥85% of equal target) - proceeding to gap-filling")
                 break
         
         # After assignment, check for any uncovered COMET nights
