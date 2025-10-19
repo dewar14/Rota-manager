@@ -271,20 +271,26 @@
         .rota-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             margin-top: 1rem;
+            table-layout: fixed;
         }
         
         .rota-table th, .rota-table td {
             border: 1px solid #dde4ef;
-            padding: 0.5rem;
+            padding: 0.25rem;
             text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .rota-table th {
             background: #34495e;
             color: white;
             font-weight: 600;
+            font-size: 0.65rem;
+            padding: 0.3rem 0.2rem;
         }
         
         /* Enhanced Shift color coding for better readability */
@@ -632,7 +638,7 @@
         const stageOrder = [
             { name: 'comet_nights', display: 'COMET Nights Assignment', api: 'comet_nights' },
             { name: 'nights', display: 'Unit Nights Assignment', api: 'nights' },
-            { name: 'holiday', display: 'Holiday Working Assignment', api: 'holiday' },
+            { name: 'weekend_holidays', display: 'Holiday Working Assignment', api: 'weekend_holidays' },
             { name: 'comet_days', display: 'COMET Days Assignment', api: 'comet_days' },
             { name: 'long_days', display: 'Unit Long Days Assignment', api: 'long_days' },
             { name: 'short_days', display: 'Short Days Assignment', api: 'short_days' }
@@ -641,22 +647,29 @@
         function startSolve() {
             if (solveInProgress) return;
             
-            // Reset sequential solving state
-            currentStage = 0;
-            currentRosterData = null;
-            
-            // Gather input data from UI
-            const startDate = document.getElementById('start-date').value;
-            const endDate = document.getElementById('end-date').value;
-            const cometStart = document.getElementById('comet-start').value;
-            const bankHolidays = document.getElementById('bank-holidays').value.split('\n').map(x => x.split(' ')[0]).filter(x => x);
-            
-            const doctors = Array.from(document.querySelectorAll('.doctor-card')).map(card => ({
+            try {
+                // Reset sequential solving state
+                currentStage = 0;
+                currentRosterData = null;
+                
+                console.log('Starting solve - gathering input data...');
+                
+                // Gather input data from UI
+                const startDate = document.getElementById('start-date').value;
+                const endDate = document.getElementById('end-date').value;
+                const cometStart = document.getElementById('comet-start').value;
+                const bankHolidays = document.getElementById('bank-holidays').value.split('\n').map(x => x.split(' ')[0]).filter(x => x);
+                
+                console.log('Basic inputs gathered, now gathering doctor data...');
+                
+                var doctors = Array.from(document.querySelectorAll('.doctor-card')).map(card => ({
                 name: card.querySelector('input[type="text"]').value,
                 grade: card.querySelector('select[name="grade"]').value,
                 wte: parseFloat(card.querySelector('select[name="wte"]').value),
                 comet_eligible: card.querySelector('input[name="comet"]').checked
             }));
+            
+            console.log('Doctor data gathered successfully:', doctors.length, 'doctors found');
             
             const regTraining = Array.from(document.getElementById('reg-training-dates').querySelectorAll('.date-item span')).map(e => e.textContent);
             const shoTraining = Array.from(document.getElementById('sho-training-dates').querySelectorAll('.date-item span')).map(e => e.textContent);
@@ -707,6 +720,14 @@
             
             // Start with first stage
             solveNextStage();
+            
+            } catch (error) {
+                console.error('Error in startSolve function:', error);
+                alert('Error starting solve: ' + error.message);
+                solveInProgress = false;
+                document.getElementById('btn-start-solve').disabled = false;
+                document.getElementById('btn-stop-solve').disabled = true;
+            }
         }
         
         function solveNextStage() {
@@ -792,6 +813,12 @@
             document.getElementById('btn-start-solve').disabled = false;
             document.getElementById('btn-stop-solve').disabled = true;
             
+            // Hide progress indicator
+            const progressDiv = document.getElementById('solve-progress');
+            if (progressDiv) {
+                progressDiv.style.display = 'none';
+            }
+            
             // Show current results
             showTab('results');
             displayRotaResults(data);
@@ -845,7 +872,7 @@
                 <p style="margin: 1rem 0; white-space: pre-line;">${message}</p>
                 <div style="text-align: right; margin-top: 2rem;">
                     ${!isComplete ? `
-                        <button onclick="continueToNextStage()" class="btn btn-success" style="margin-right: 1rem;">
+                        <button onclick="continueFromModal()" class="btn btn-success" style="margin-right: 1rem;">
                             ✅ Continue to "${nextStage}"
                         </button>
                     ` : ''}
@@ -860,7 +887,7 @@
             window.currentStageModal = modal;
         }
         
-        function continueToNextStage() {
+        function continueFromModal() {
             closeStageDialog();
             currentStage++;
             setTimeout(solveNextStage, 500); // Small delay for UI
@@ -1207,13 +1234,14 @@
         }
         
         function generateDoctorKey() {
-            const doctors = Array.from(document.querySelectorAll('.doctor-card')).map((card, index) => ({
+            const doctorCards = Array.from(document.querySelectorAll('.doctor-card'));
+            const doctors = doctorCards.map((card, index) => ({
                 id: `dr${index + 1}`,
                 name: card.querySelector('input[type="text"]').value || `Doctor ${index + 1}`,
                 wte: parseFloat(card.querySelector('select[name="wte"]').value || 0.8),
                 grade: card.querySelector('select[name="grade"]').value || 'Registrar',
                 comet: card.querySelector('input[name="comet"]').checked
-            })).filter(d => d.name.trim() !== '' && d.name !== `Doctor ${doctors.length}`);
+            })).filter((d, index) => d.name.trim() !== '' && d.name !== `Doctor ${index + 1}`);
 
             let keyHtml = `
                 <div class="card" style="margin-bottom: 1rem; background: #f8f9fa; border-left: 4px solid #3498db;">
@@ -1241,6 +1269,39 @@
             return keyHtml;
         }
 
+        function continueToNextStage() {
+            // First, check if there's a modal and use its button
+            const modalContinueBtn = document.querySelector('button[onclick*="continueFromModal"]');
+            if (modalContinueBtn) {
+                modalContinueBtn.click();
+                return;
+            }
+            
+            // Check if there are more stages to process
+            if (currentStage >= stageOrder.length - 1) {
+                alert('All stages completed! This is the final rota.');
+                return;
+            }
+            
+            // If no modal present, need to reactivate the solving state since showStageResults sets it to false
+            solveInProgress = true;
+            document.getElementById('btn-start-solve').disabled = true;
+            document.getElementById('btn-stop-solve').disabled = false;
+            
+            // Use the exact same logic as the modal button
+            currentStage++;
+            setTimeout(solveNextStage, 500); // Small delay for UI - same as modal
+        }
+
+        function startInteractiveMode() {
+            // Switch to generate tab and start interactive mode
+            showTab('generate');
+            setTimeout(() => {
+                // Start interactive solve
+                document.getElementById('btn-interactive').click();
+            }, 100);
+        }
+
         function continueFromResults() {
             if (interactiveState.nextStage) {
                 continueInteractive();
@@ -1260,12 +1321,24 @@
             // Add doctor key at the top
             const doctorKeyHtml = generateDoctorKey();
             
-            // Add continue button if in interactive mode
-            const continueButtonHtml = solveInProgress ? 
-                `<div style="margin-bottom: 1rem;">
-                    <button class="btn btn-primary" onclick="showInteractiveMode()" style="margin-right: 1rem;">📋 Return to Interactive Mode</button>
-                    <button class="btn btn-success" onclick="continueFromResults()" style="margin-right: 1rem;">➡️ Continue to Next Stage</button>
-                </div>` : '';
+            // Add continue button - always available with dynamic text
+            let nextStageText = 'Continue to Next Stage';
+            if (currentStage < stageOrder.length - 1) {
+                nextStageText = `Continue to "${stageOrder[currentStage + 1].display}"`;
+            }
+            
+            const continueButtonHtml = 
+                `<div style="margin: 2rem 0; text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 2px solid #e9ecef;">
+                    <h4 style="margin-bottom: 1rem; color: #495057;">🎯 Next Steps</h4>
+                    ${currentStage < stageOrder.length - 1 ? 
+                        `<button class="btn btn-success" onclick="continueToNextStage()" style="margin-right: 1rem;">✅ ${nextStageText}</button>
+                         <button class="btn btn-info" onclick="showInteractiveMode()" style="margin-right: 1rem;">🎛️ Interactive Mode</button>` :
+                        `<button class="btn btn-primary" onclick="showTab('generate')" style="margin-right: 1rem;">🔄 Generate New Rota</button>
+                         <button class="btn btn-info" onclick="showTab('generate')" style="margin-right: 1rem;">⚙️ Modify Settings</button>`
+                    }
+                    <button class="btn btn-secondary" onclick="exportExcel()" style="margin-right: 1rem;">📊 Export Excel</button>
+                    <button class="btn btn-secondary" onclick="exportPDF()">📄 Export PDF</button>
+                </div>`;
             
             // Build shift legend first
             const legendHtml = `
@@ -1309,10 +1382,10 @@
                 idToName[doctorId] = doctorName;
             });
 
-            let html = legendHtml + '<table class="rota-table"><thead><tr><th>Date</th>';
+            let html = legendHtml + '<div style="overflow-x: auto; margin: 1rem 0;"><table class="rota-table"><thead><tr><th>Date</th>';
             doctorNames.forEach(name => {
                 const displayName = idToName[name] || name.replace(/^dr\d+$/, 'Dr ' + name.slice(2));
-                html += `<th style="min-width: 120px;" title="${name}">${displayName}</th>`;
+                html += `<th style="min-width: 80px;" title="${name}">${displayName}</th>`;
             });
             html += '</tr></thead><tbody>';
             
@@ -1336,13 +1409,13 @@
                 });
                 html += '</tr>';
             });
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             
             // Add summary statistics
             html += generateRotaSummary(roster, doctorNames);
             
-            // Combine all HTML content
-            const finalHtml = doctorKeyHtml + continueButtonHtml + html;
+            // Combine all HTML content - put continue button and doctor key at bottom
+            const finalHtml = legendHtml + html + continueButtonHtml + doctorKeyHtml;
             container.innerHTML = finalHtml;
         }
         
@@ -1428,7 +1501,8 @@
                 const unitNights = (counts['N_REG'] || 0) + (counts['N_SHO'] || 0);
                 const longDays = (counts['LD_REG'] || 0) + (counts['LD_SHO'] || 0);
                 const shortDays = (counts['SD'] || 0);
-                const holidays = (counts['LEAVE'] || 0);
+                // Count work on bank holidays (not LEAVE)
+                const holidaysWorked = calculateHolidayWork(roster, rosterDates, doctor);
                 const totalShifts = Object.values(counts).reduce((a, b) => a + b, 0);
                 
                 // Calculate total hours (approximate)
@@ -1448,7 +1522,7 @@
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${unitNights}</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${longDays}</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${shortDays}</td>`;
-                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${holidays}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${holidaysWorked}</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${avgWeeklyHours}h</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><strong>${totalShifts}</strong></td>`;
                 summaryHtml += '</tr>';
@@ -1457,6 +1531,21 @@
             
             summaryHtml += '</div></div>';
             return summaryHtml;
+        }
+        
+        function calculateHolidayWork(roster, dates, doctor) {
+            let holidayCount = 0;
+            dates.forEach(date => {
+                const isBankHoliday = checkIfBankHoliday(date);
+                if (isBankHoliday) {
+                    const shift = roster[date][doctor];
+                    // Count any work shift on a bank holiday (not OFF or LEAVE)
+                    if (shift && shift !== 'OFF' && shift !== 'LEAVE') {
+                        holidayCount++;
+                    }
+                }
+            });
+            return holidayCount;
         }
         
         // Export functions

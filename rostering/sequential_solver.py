@@ -1352,6 +1352,56 @@ class SequentialSolver:
         
         return True
     
+    def _check_day_shift_rest_ok(self, day, doctor_id):
+        """Check if assigning a day shift on this day would violate 46h rest after nights.
+        
+        This checks if the person worked nights recently and needs rest before working a day shift.
+        """
+        day_idx = None
+        for i, d in enumerate(self.days):
+            if d == day:
+                day_idx = i
+                break
+        
+        if day_idx is None or day_idx == 0:
+            return True  # First day or not found, assume OK
+        
+        # Look backwards to find if there was a recent night block that ended
+        night_shifts = [ShiftType.COMET_NIGHT.value, ShiftType.NIGHT_REG.value, ShiftType.NIGHT_SHO.value]
+        
+        # Check if previous day was the end of a night block
+        prev_day = self.days[day_idx - 1]
+        prev_assignment = self.partial_roster[prev_day.isoformat()][doctor_id]
+        
+        if prev_assignment in night_shifts:
+            # Previous day was a night shift - check if it was the end of a block
+            was_block_end = True
+            
+            # Look ahead from previous day to see if more nights would follow
+            if day_idx < len(self.days):  # Current day exists
+                current_assignment = self.partial_roster[day.isoformat()][doctor_id]
+                if current_assignment in night_shifts:
+                    was_block_end = False  # Night block continues
+            
+            if was_block_end:
+                print(f"      ❌ 46h rest violation: {doctor_id} worked night on {prev_day}, cannot work day shift on {day}")
+                return False
+        
+        # Also check if day before previous was end of night block (need 2 days off)
+        if day_idx >= 2:
+            two_days_ago = self.days[day_idx - 2]
+            two_days_ago_assignment = self.partial_roster[two_days_ago.isoformat()][doctor_id]
+            prev_assignment = self.partial_roster[prev_day.isoformat()][doctor_id]
+            
+            if (two_days_ago_assignment in night_shifts and 
+                prev_assignment not in night_shifts and 
+                prev_assignment != ShiftType.OFF.value):
+                # Night block ended 2 days ago, but they worked yesterday (not full 46h rest)
+                print(f"      ❌ 46h rest violation: {doctor_id} night block ended {two_days_ago}, worked {prev_assignment} on {prev_day}, insufficient rest for day shift on {day}")
+                return False
+        
+        return True
+
     def _solve_comet_days_stage(self, timeout_seconds: int) -> SequentialSolveResult:
         """Stage 4: Assign COMET day shifts after holidays are covered."""
         
@@ -1696,94 +1746,228 @@ class SequentialSolver:
             running_totals[p_idx]['total_hours'] += 12
 
     def _solve_weekend_holiday_stage(self, timeout_seconds: int) -> SequentialSolveResult:
-        """Stage 3: Assign weekend and holiday long days - exactly 1 LD_REG per weekend/holiday day (Priority 3)."""
+        """Stage 3: Holiday assignment - COMET days (COMET eligible only) and Unit long days on bank holidays."""
+        
+        print("🏦 Holiday Assignment Stage")
+        print(f"Bank holidays in period: {[d.isoformat() for d in self.config.bank_holidays]}")
+        
+        # First count existing holiday work (nights already assigned on bank holidays)
+        existing_holiday_work = self._count_existing_holiday_work()
+        print(f"Existing holiday night coverage: {existing_holiday_work}")
+        
+        # Phase 1: Assign COMET days on bank holidays (COMET eligible only)
+        comet_assignments = self._assign_comet_holiday_days(timeout_seconds // 2)
+        
+        # Phase 2: Assign Unit long days on remaining bank holiday slots  
+        long_day_assignments = self._assign_unit_holiday_long_days(timeout_seconds // 2)
+        
+        # Calculate total holiday work for fairness analysis
+        total_holiday_work = self._calculate_total_holiday_work()
+        
+        # Report holiday work distribution
+        print("📊 Holiday Work Distribution:")
+        for person_id, count in total_holiday_work.items():
+            print(f"  {person_id}: {count} bank holidays worked")
+        
+        # Check for reasonable distribution (warn if spread > 3)
+        work_counts = list(total_holiday_work.values())
+        if work_counts:
+            min_work = min(work_counts)
+            max_work = max(work_counts)
+            if max_work - min_work > 3:
+                print(f"⚠️  Holiday work spread is {max_work - min_work} (some work {max_work}, others {min_work})")
+        
+        return SequentialSolveResult(
+            stage="weekend_holidays", 
+            success=True,
+            message=f"Holiday assignment completed. Assigned {len(comet_assignments)} COMET days and {len(long_day_assignments)} Unit long days on bank holidays. Total holiday work spread: {min_work if work_counts else 0}-{max_work if work_counts else 0}.",
+            partial_roster=copy.deepcopy(self.partial_roster),
+            assigned_shifts=comet_assignments.union(long_day_assignments),
+            next_stage="comet_days"
+        )
+    
+    def _count_existing_holiday_work(self) -> Dict[str, int]:
+        """Count holiday work already assigned (nights on bank holidays)."""
+        holiday_work = {person.id: 0 for person in self.people}
+        
+        for day in self.days:
+            if day in self.config.bank_holidays:
+                day_str = day.isoformat()
+                if day_str in self.partial_roster:
+                    for person_id, shift in self.partial_roster[day_str].items():
+                        # Count night shifts as holiday work
+                        if shift in [ShiftType.COMET_NIGHT.value, ShiftType.NIGHT_REG.value, ShiftType.NIGHT_SHO.value]:
+                            holiday_work[person_id] += 1
+        
+        return holiday_work
+    
+    def _assign_comet_holiday_days(self, timeout_seconds: int) -> set:
+        """Assign COMET day shifts on bank holidays (COMET eligible only)."""
         
         model = cp_model.CpModel()
+        assignments = set()
         
-        # Create decision variables for long day shifts on weekends/holidays
-        long_day_shifts = [ShiftType.LONG_DAY_REG]  # Ignoring SHO for now as requested
-        allowed_shifts = long_day_shifts + [ShiftType.OFF]
-        
-        # Identify weekend and holiday days
-        weekend_holiday_days = []
+        # Identify bank holidays that need COMET day coverage
+        bank_holiday_indices = []
         for d_idx, day in enumerate(self.days):
-            is_weekend = day.weekday() in [5, 6]  # Saturday, Sunday
-            is_holiday = day in self.config.bank_holidays
-            if is_weekend or is_holiday:
-                weekend_holiday_days.append(d_idx)
+            if day in self.config.bank_holidays:
+                bank_holiday_indices.append(d_idx)
         
+        if not bank_holiday_indices:
+            print("No bank holidays found in period")
+            return assignments
+        
+        # Create decision variables for COMET days
         x = {}
-        for p_idx, person in enumerate(self.people):
-            for d_idx in weekend_holiday_days:
+        comet_eligible_people = [(p_idx, person) for p_idx, person in enumerate(self.people) 
+                               if person.comet_eligible]
+        
+        for p_idx, person in comet_eligible_people:
+            for d_idx in bank_holiday_indices:
                 day = self.days[d_idx]
-                # Skip days where person already has a non-OFF assignment
-                current_assignment = self.partial_roster[day.isoformat()][person.id]
-                if current_assignment != ShiftType.OFF.value:
-                    continue
-                    
-                for shift in allowed_shifts:
-                    x[p_idx, d_idx, shift] = model.NewBoolVar(f"x_{p_idx}_{d_idx}_{shift.value}")
+                day_str = day.isoformat()
+                current_shift = self.partial_roster[day_str][person.id]
+                
+                # Can only assign COMET day if currently OFF AND not violating night rest
+                if current_shift == ShiftType.OFF.value and self._check_day_shift_rest_ok(day, person.id):
+                    x[p_idx, d_idx] = model.NewBoolVar(f"comet_day_{p_idx}_{d_idx}")
         
-        # Each person can only have one shift per day (for unassigned weekend/holiday days)
-        for p_idx, person in enumerate(self.people):
-            for d_idx in weekend_holiday_days:
-                day = self.days[d_idx]
-                current_assignment = self.partial_roster[day.isoformat()][person.id]
-                if current_assignment == ShiftType.OFF.value:
-                    model.Add(sum(x.get((p_idx, d_idx, s), 0) for s in allowed_shifts) == 1)
+        # Ensure exactly 1 COMET day registrar per bank holiday (if possible)
+        for d_idx in bank_holiday_indices:
+            available_people = [p_idx for p_idx, _ in comet_eligible_people 
+                              if (p_idx, d_idx) in x]
+            if available_people:
+                model.Add(sum(x[p_idx, d_idx] for p_idx in available_people) == 1)
         
-        # Weekend coverage requirements
-        self._add_weekend_coverage_constraints(model, x, long_day_shifts, weekend_holiday_days)
-        
-        # Add global rest constraints to prevent violating rest periods
-        self._add_global_rest_constraints(model, x)
-        
-        # Add fairness constraints for equitable distribution (within stage only for now)
-        self._add_global_fairness_constraints(model, x, long_day_shifts, "weekend_holidays")
-        
-        # Grade-specific constraints
-        for p_idx, person in enumerate(self.people):
-            for d_idx in weekend_holiday_days:
-                if person.grade not in ["Registrar"] and (p_idx, d_idx, ShiftType.LONG_DAY_REG) in x:
-                    model.Add(x[p_idx, d_idx, ShiftType.LONG_DAY_REG] == 0)
-                if person.grade not in ["SHO"] and (p_idx, d_idx, ShiftType.LONG_DAY_SHO) in x:
-                    model.Add(x[p_idx, d_idx, ShiftType.LONG_DAY_SHO] == 0)
+        # Add fairness constraint - try to distribute COMET holiday days
+        if len(comet_eligible_people) > 1 and len(bank_holiday_indices) > 1:
+            comet_counts = []
+            for p_idx, _ in comet_eligible_people:
+                count_var = model.NewIntVar(0, len(bank_holiday_indices), f"comet_holiday_count_{p_idx}")
+                model.Add(count_var == sum(x.get((p_idx, d_idx), 0) for d_idx in bank_holiday_indices))
+                comet_counts.append(count_var)
+            
+            # Minimize difference between max and min assignments
+            max_var = model.NewIntVar(0, len(bank_holiday_indices), "max_comet_holidays")
+            min_var = model.NewIntVar(0, len(bank_holiday_indices), "min_comet_holidays")
+            model.AddMaxEquality(max_var, comet_counts)
+            model.AddMinEquality(min_var, comet_counts)
+            
+            fairness_var = model.NewIntVar(0, len(bank_holiday_indices), "comet_fairness")
+            model.Add(fairness_var == max_var - min_var)
+            model.Minimize(fairness_var)
         
         # Solve
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = timeout_seconds
-        
         status = solver.Solve(model)
         
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
-            # Extract weekend/holiday assignments
-            new_assignments = set()
-            for p_idx, person in enumerate(self.people):
-                for d_idx in weekend_holiday_days:
-                    day = self.days[d_idx]
-                    for shift in long_day_shifts:
-                        if (p_idx, d_idx, shift) in x and solver.Value(x[p_idx, d_idx, shift]) == 1:
-                            # Update partial roster
-                            self.partial_roster[day.isoformat()][person.id] = shift.value
-                            new_assignments.add((p_idx, d_idx, shift))
-                            self.assigned_shifts.add((p_idx, d_idx, shift))
+            for p_idx, person in comet_eligible_people:
+                for d_idx in bank_holiday_indices:
+                    if (p_idx, d_idx) in x and solver.Value(x[p_idx, d_idx]) == 1:
+                        day = self.days[d_idx]
+                        day_str = day.isoformat()
+                        self.partial_roster[day_str][person.id] = ShiftType.COMET_DAY.value
+                        assignments.add((p_idx, d_idx, ShiftType.COMET_DAY))
+                        self.assigned_shifts.add((p_idx, d_idx, ShiftType.COMET_DAY))
+                        print(f"  Assigned COMET day on {day_str} to {person.name}")
+        
+        return assignments
+    
+    def _assign_unit_holiday_long_days(self, timeout_seconds: int) -> set:
+        """Assign Unit long day shifts on bank holidays without COMET day coverage."""
+        
+        model = cp_model.CpModel()
+        assignments = set()
+        
+        # Find bank holidays that still need Unit long day coverage
+        need_long_day_coverage = []
+        for d_idx, day in enumerate(self.days):
+            if day in self.config.bank_holidays:
+                day_str = day.isoformat()
+                # Check if day already has COMET day coverage
+                has_comet_day = any(shift == ShiftType.COMET_DAY.value 
+                                  for shift in self.partial_roster[day_str].values())
+                if not has_comet_day:
+                    need_long_day_coverage.append(d_idx)
+        
+        if not need_long_day_coverage:
+            print("All bank holidays have COMET day coverage")
+            return assignments
+        
+        # Create decision variables for Unit long days
+        x = {}
+        registrars = [(p_idx, person) for p_idx, person in enumerate(self.people) 
+                     if person.grade == "Registrar"]
+        
+        for p_idx, person in registrars:
+            for d_idx in need_long_day_coverage:
+                day = self.days[d_idx]
+                day_str = day.isoformat()
+                current_shift = self.partial_roster[day_str][person.id]
+                
+                # Can only assign long day if currently OFF AND not violating night rest
+                if current_shift == ShiftType.OFF.value and self._check_day_shift_rest_ok(day, person.id):
+                    x[p_idx, d_idx] = model.NewBoolVar(f"long_day_{p_idx}_{d_idx}")
+        
+        # Ensure exactly 1 long day registrar per uncovered bank holiday
+        for d_idx in need_long_day_coverage:
+            available_people = [p_idx for p_idx, _ in registrars 
+                              if (p_idx, d_idx) in x]
+            if available_people:
+                model.Add(sum(x[p_idx, d_idx] for p_idx in available_people) == 1)
+        
+        # Add fairness constraint for long day distribution
+        if len(registrars) > 1 and len(need_long_day_coverage) > 1:
+            long_day_counts = []
+            for p_idx, _ in registrars:
+                count_var = model.NewIntVar(0, len(need_long_day_coverage), f"long_day_holiday_count_{p_idx}")
+                model.Add(count_var == sum(x.get((p_idx, d_idx), 0) for d_idx in need_long_day_coverage))
+                long_day_counts.append(count_var)
             
-            return SequentialSolveResult(
-                stage="weekend_holidays",
-                success=True,
-                message=f"Weekend/holiday stage completed. Assigned {len(new_assignments)} long day shifts.",
-                partial_roster=copy.deepcopy(self.partial_roster),
-                assigned_shifts=new_assignments,
-                next_stage="weekday_long_days"
-            )
-        else:
-            return SequentialSolveResult(
-                stage="weekend_holidays",
-                success=False,
-                message=f"Weekend/holiday stage failed: {solver.StatusName(status)}",
-                partial_roster=copy.deepcopy(self.partial_roster),
-                next_stage="weekday_long_days"
-            )
+            # Minimize difference between max and min assignments
+            max_var = model.NewIntVar(0, len(need_long_day_coverage), "max_long_day_holidays")
+            min_var = model.NewIntVar(0, len(need_long_day_coverage), "min_long_day_holidays")
+            model.AddMaxEquality(max_var, long_day_counts)
+            model.AddMinEquality(min_var, long_day_counts)
+            
+            fairness_var = model.NewIntVar(0, len(need_long_day_coverage), "long_day_fairness")
+            model.Add(fairness_var == max_var - min_var)
+            model.Minimize(fairness_var)
+        
+        # Solve
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = timeout_seconds
+        status = solver.Solve(model)
+        
+        if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
+            for p_idx, person in registrars:
+                for d_idx in need_long_day_coverage:
+                    if (p_idx, d_idx) in x and solver.Value(x[p_idx, d_idx]) == 1:
+                        day = self.days[d_idx]
+                        day_str = day.isoformat()
+                        self.partial_roster[day_str][person.id] = ShiftType.LONG_DAY_REG.value
+                        assignments.add((p_idx, d_idx, ShiftType.LONG_DAY_REG))
+                        self.assigned_shifts.add((p_idx, d_idx, ShiftType.LONG_DAY_REG))
+                        print(f"  Assigned Unit long day on {day_str} to {person.name}")
+        
+        return assignments
+    
+    def _calculate_total_holiday_work(self) -> Dict[str, int]:
+        """Calculate total holiday work for each person (nights + days on bank holidays)."""
+        holiday_work = {person.id: 0 for person in self.people}
+        
+        for day in self.days:
+            if day in self.config.bank_holidays:
+                day_str = day.isoformat()
+                if day_str in self.partial_roster:
+                    for person_id, shift in self.partial_roster[day_str].items():
+                        # Count any non-OFF shift on a bank holiday as holiday work
+                        if shift != ShiftType.OFF.value:
+                            holiday_work[person_id] += 1
+        
+        return holiday_work
     
     def _solve_weekday_long_days_stage(self, timeout_seconds: int) -> SequentialSolveResult:
         """Stage 4: Assign weekday long days - exactly 1 LD_REG per weekday (Priority 4)."""
