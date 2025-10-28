@@ -1539,21 +1539,65 @@ class SequentialSolver:
                         model.Add(x[p_idx, d_idx] == 0)
         
         # ========================================
-        # OBJECTIVE: Encourage blocks + WTE-adjusted fairness
+        # OBJECTIVE: Strong block preference + WTE-adjusted fairness
         # ========================================
         
         objective_terms = []
         
-        # Part 1: Block preference (reward consecutive nights)
+        # Part 1: STRONG block preference with multiple reward levels
+        # This mimics the greedy algorithm's preference for 2-4 night blocks
+        
         for p_idx, person in unit_night_eligible:
+            # Reward blocks of different sizes with escalating bonuses
+            
+            # 4-night blocks (highest reward) - like greedy prefers 4-night blocks
+            for d_idx in range(len(unit_night_days) - 3):
+                if all((p_idx, d_idx + offset) in x for offset in range(4)):
+                    block_4_var = model.NewBoolVar(f"block4_{p_idx}_{d_idx}")
+                    model.Add(block_4_var >= sum(x[p_idx, d_idx + offset] for offset in range(4)) - 3)
+                    objective_terms.append(block_4_var * 200)  # +200 for 4-night block
+            
+            # 3-night blocks (high reward)
+            for d_idx in range(len(unit_night_days) - 2):
+                if all((p_idx, d_idx + offset) in x for offset in range(3)):
+                    block_3_var = model.NewBoolVar(f"block3_{p_idx}_{d_idx}")
+                    model.Add(block_3_var >= sum(x[p_idx, d_idx + offset] for offset in range(3)) - 2)
+                    objective_terms.append(block_3_var * 120)  # +120 for 3-night block
+            
+            # 2-night blocks (good reward)
             for d_idx in range(len(unit_night_days) - 1):
                 if (p_idx, d_idx) in x and (p_idx, d_idx + 1) in x:
-                    # Create bonus variable for consecutive nights
-                    consecutive_var = model.NewBoolVar(f"consecutive_{p_idx}_{d_idx}")
-                    model.Add(consecutive_var >= x[p_idx, d_idx] + x[p_idx, d_idx + 1] - 1)
-                    objective_terms.append(consecutive_var * 10)  # +10 bonus for each consecutive pair
+                    block_2_var = model.NewBoolVar(f"block2_{p_idx}_{d_idx}")
+                    model.Add(block_2_var >= x[p_idx, d_idx] + x[p_idx, d_idx + 1] - 1)
+                    objective_terms.append(block_2_var * 50)  # +50 for 2-night block
+            
+            # PENALTY for singletons (isolated nights)
+            for d_idx in range(len(unit_night_days)):
+                if (p_idx, d_idx) not in x:
+                    continue
+                
+                # Check if this night is isolated (not part of a block)
+                is_isolated = True
+                
+                # Check if previous day is also worked
+                if d_idx > 0 and (p_idx, d_idx - 1) in x:
+                    prev_connected = model.NewBoolVar(f"prev_conn_{p_idx}_{d_idx}")
+                    model.Add(prev_connected >= x[p_idx, d_idx] + x[p_idx, d_idx - 1] - 1)
+                    is_isolated = False
+                
+                # Check if next day is also worked  
+                if d_idx < len(unit_night_days) - 1 and (p_idx, d_idx + 1) in x:
+                    next_connected = model.NewBoolVar(f"next_conn_{p_idx}_{d_idx}")
+                    model.Add(next_connected >= x[p_idx, d_idx] + x[p_idx, d_idx + 1] - 1)
+                    is_isolated = False
+                
+                # If truly isolated (no prev or next), penalize it
+                if is_isolated:
+                    singleton_var = model.NewBoolVar(f"singleton_{p_idx}_{d_idx}")
+                    model.Add(singleton_var == x[p_idx, d_idx])
+                    objective_terms.append(singleton_var * -100)  # -100 penalty for singleton
         
-        # Part 2: WTE-adjusted fairness
+        # Part 2: WTE-adjusted fairness (with reduced weight to allow blocks)
         total_wte = sum(person.wte for _, person in unit_night_eligible)
         
         for p_idx, person in unit_night_eligible:
@@ -1569,17 +1613,17 @@ class SequentialSolver:
                 wte_proportion = person.wte / total_wte if total_wte > 0 else 0
                 expected_count = int(len(unit_night_days) * wte_proportion)
                 
-                # Minimize deviation from expected
+                # Minimize deviation from expected (but with lower weight than block bonuses)
                 deviation_var = model.NewIntVar(-len(unit_night_days), len(unit_night_days), f"dev_{p_idx}")
                 model.Add(deviation_var == count_var - expected_count)
                 
                 abs_deviation = model.NewIntVar(0, len(unit_night_days), f"abs_dev_{p_idx}")
                 model.AddAbsEquality(abs_deviation, deviation_var)
                 
-                # Subtract deviation (we want to minimize it)
-                objective_terms.append(-abs_deviation)
+                # Reduced weight: -5 per deviation unit (vs block bonuses of 50-200)
+                objective_terms.append(abs_deviation * -5)
         
-        # Combined objective: Maximize blocks, minimize unfairness
+        # Combined objective: Heavily favor blocks, then optimize fairness
         if objective_terms:
             model.Maximize(sum(objective_terms))
         
