@@ -2328,45 +2328,362 @@ class SequentialSolver:
             running_totals[p_idx]['total_hours'] += 12
 
     def _solve_weekend_holiday_stage(self, timeout_seconds: int) -> SequentialSolveResult:
-        """Stage 3: Holiday assignment - COMET days (COMET eligible only) and Unit long days on bank holidays."""
+        """Stage 3: Weekend Long Days - COMET weekend days (COMET weeks only) and Unit weekend long days (all weekends)."""
         
-        print("🏦 Holiday Assignment Stage")
-        print(f"Bank holidays in period: {[d.isoformat() for d in self.config.bank_holidays]}")
+        print("=" * 80)
+        print("WEEKEND LONG DAYS STAGE")
+        print("=" * 80)
         
-        # First count existing holiday work (nights already assigned on bank holidays)
-        existing_holiday_work = self._count_existing_holiday_work()
-        print(f"Existing holiday night coverage: {existing_holiday_work}")
+        # Phase 1: Assign COMET weekend long days (COMET weeks only, no continuity short days)
+        print("\n📦 Phase 1: COMET Weekend Long Days")
+        comet_assignments = self._assign_comet_weekend_long_days(timeout_seconds // 2)
         
-        # Phase 1: Assign COMET days on bank holidays (COMET eligible only)
-        comet_assignments = self._assign_comet_holiday_days(timeout_seconds // 2)
+        # Phase 2: Assign Unit weekend long days (all weekends + continuity short days)
+        print("\n📦 Phase 2: Unit Weekend Long Days")
+        unit_assignments = self._assign_unit_weekend_long_days(timeout_seconds // 2)
         
-        # Phase 2: Assign Unit long days on remaining bank holiday slots  
-        long_day_assignments = self._assign_unit_holiday_long_days(timeout_seconds // 2)
+        # Report weekend distribution
+        weekend_counts = self._calculate_weekend_blocks_worked()
+        print("\n📊 Weekend Block Distribution:")
+        for person_id, count in weekend_counts.items():
+            person = next((p for p in self.people if p.id == person_id), None)
+            wte = person.wte if person else 1.0
+            print(f"  {person_id}: {count} weekend blocks (WTE: {wte})")
         
-        # Calculate total holiday work for fairness analysis
-        total_holiday_work = self._calculate_total_holiday_work()
-        
-        # Report holiday work distribution
-        print("📊 Holiday Work Distribution:")
-        for person_id, count in total_holiday_work.items():
-            print(f"  {person_id}: {count} bank holidays worked")
-        
-        # Check for reasonable distribution (warn if spread > 3)
-        work_counts = list(total_holiday_work.values())
-        if work_counts:
-            min_work = min(work_counts)
-            max_work = max(work_counts)
-            if max_work - min_work > 3:
-                print(f"⚠️  Holiday work spread is {max_work - min_work} (some work {max_work}, others {min_work})")
-        
+        total_assignments = len(comet_assignments) + len(unit_assignments)
         return SequentialSolveResult(
             stage="weekend_holidays", 
             success=True,
-            message=f"Holiday assignment completed. Assigned {len(comet_assignments)} COMET days and {len(long_day_assignments)} Unit long days on bank holidays. Total holiday work spread: {min_work if work_counts else 0}-{max_work if work_counts else 0}.",
+            message=f"Weekend long days completed. Assigned {len(comet_assignments)} COMET weekend shifts and {len(unit_assignments)} Unit weekend shifts.",
             partial_roster=copy.deepcopy(self.partial_roster),
-            assigned_shifts=comet_assignments.union(long_day_assignments),
+            assigned_shifts=comet_assignments.union(unit_assignments),
             next_stage="comet_days"
         )
+    
+    def _assign_comet_weekend_long_days(self, timeout_seconds: int) -> set:
+        """Assign COMET_DAY shifts on weekends during COMET weeks (Sat+Sun blocks, no continuity days)."""
+        
+        model = cp_model.CpModel()
+        assignments = set()
+        
+        # Get COMET-eligible registrars
+        comet_eligible = [(p_idx, p) for p_idx, p in enumerate(self.people) if p.comet_eligible]
+        if not comet_eligible:
+            print("  No COMET-eligible doctors found")
+            return assignments
+        
+        # Identify COMET week ranges
+        comet_week_ranges = []
+        for monday in self.config.comet_on_weeks:
+            week_end = monday + timedelta(days=6)
+            comet_week_ranges.append((monday, week_end))
+        
+        # Find all Saturday-Sunday pairs in COMET weeks
+        comet_weekends = []
+        for day in self.days:
+            if day.weekday() == 5:  # Saturday
+                # Check if this Saturday is in a COMET week
+                in_comet_week = any(week_start <= day <= week_end 
+                                   for week_start, week_end in comet_week_ranges)
+                if in_comet_week:
+                    sunday = day + timedelta(days=1)
+                    if sunday in self.days:
+                        comet_weekends.append((day, sunday))
+        
+        print(f"  Found {len(comet_weekends)} COMET weekends to cover")
+        
+        if not comet_weekends:
+            return assignments
+        
+        # Create decision variables: x[p_idx, weekend_idx] = 1 if person works this COMET weekend
+        x = {}
+        for p_idx, person in comet_eligible:
+            for w_idx, (saturday, sunday) in enumerate(comet_weekends):
+                # Check if person is available on both days
+                sat_str = saturday.isoformat()
+                sun_str = sunday.isoformat()
+                
+                sat_shift = self.partial_roster[sat_str][person.id]
+                sun_shift = self.partial_roster[sun_str][person.id]
+                
+                # Can only assign if both days are OFF
+                if sat_shift == ShiftType.OFF.value and sun_shift == ShiftType.OFF.value:
+                    x[p_idx, w_idx] = model.NewBoolVar(f"comet_weekend_{p_idx}_{w_idx}")
+        
+        # HARD CONSTRAINT: Exactly 1 COMET-eligible doctor per weekend
+        for w_idx in range(len(comet_weekends)):
+            available = [p_idx for p_idx, _ in comet_eligible if (p_idx, w_idx) in x]
+            if available:
+                model.Add(sum(x[p_idx, w_idx] for p_idx in available) == 1)
+        
+        # FAIRNESS: Minimize max weekend blocks (WTE-adjusted)
+        max_weekends = model.NewIntVar(0, len(comet_weekends) * 100, 'max_comet_weekends')
+        
+        for p_idx, person in comet_eligible:
+            weekends_worked = sum(x.get((p_idx, w_idx), 0) for w_idx in range(len(comet_weekends)))
+            # WTE-adjust: scale by 100/wte for integer math
+            wte_scale = int(100 / person.wte)
+            wte_adjusted_load = weekends_worked * wte_scale
+            model.Add(max_weekends >= wte_adjusted_load)
+        
+        # Minimize maximum load
+        model.Minimize(max_weekends)
+        
+        # Solve
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = timeout_seconds
+        solver.parameters.relative_gap_limit = 0.05
+        status = solver.Solve(model)
+        
+        if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
+            for p_idx, person in comet_eligible:
+                for w_idx, (saturday, sunday) in enumerate(comet_weekends):
+                    if (p_idx, w_idx) in x and solver.Value(x[p_idx, w_idx]) == 1:
+                        # Assign both Saturday and Sunday
+                        sat_str = saturday.isoformat()
+                        sun_str = sunday.isoformat()
+                        
+                        self.partial_roster[sat_str][person.id] = ShiftType.COMET_DAY.value
+                        self.partial_roster[sun_str][person.id] = ShiftType.COMET_DAY.value
+                        
+                        assignments.add((p_idx, self.days.index(saturday), ShiftType.COMET_DAY))
+                        assignments.add((p_idx, self.days.index(sunday), ShiftType.COMET_DAY))
+                        
+                        print(f"  ✅ {person.name}: COMET weekend {saturday.strftime('%Y-%m-%d')} - {sunday.strftime('%Y-%m-%d')}")
+        else:
+            print(f"  ⚠️ Solver status: {solver.StatusName(status)}")
+        
+        return assignments
+    
+    def _assign_unit_weekend_long_days(self, timeout_seconds: int) -> set:
+        """Assign LONG_DAY_REG shifts on all weekends (Sat+Sun blocks + continuity short day on Fri or Mon)."""
+        
+        model = cp_model.CpModel()
+        assignments = set()
+        
+        # Get all registrars
+        registrars = [(p_idx, p) for p_idx, p in enumerate(self.people) if p.grade == "Registrar"]
+        if not registrars:
+            print("  No registrars found")
+            return assignments
+        
+        # Find all Saturday-Sunday pairs
+        all_weekends = []
+        for day in self.days:
+            if day.weekday() == 5:  # Saturday
+                sunday = day + timedelta(days=1)
+                if sunday in self.days:
+                    all_weekends.append((day, sunday))
+        
+        print(f"  Found {len(all_weekends)} total weekends to cover")
+        
+        if not all_weekends:
+            return assignments
+        
+        # Identify holiday singleton dates (Christmas Eve, Christmas, Boxing Day, New Year's Eve)
+        holiday_singleton_dates = set()
+        for day in self.days:
+            if (day.month == 12 and day.day in [24, 25, 26, 31]) or (day.month == 1 and day.day == 1):
+                holiday_singleton_dates.add(day)
+        
+        # Decision variables
+        # x[p_idx, w_idx] = 1 if person works this weekend (both Sat+Sun)
+        # For holiday weekends, we may need separate variables for individual days
+        x = {}  # Weekend blocks
+        x_single = {}  # Holiday singletons
+        
+        for p_idx, person in registrars:
+            for w_idx, (saturday, sunday) in enumerate(all_weekends):
+                sat_str = saturday.isoformat()
+                sun_str = sunday.isoformat()
+                
+                sat_shift = self.partial_roster[sat_str][person.id]
+                sun_shift = self.partial_roster[sun_str][person.id]
+                
+                # Check if either day is a holiday singleton date
+                sat_is_holiday = saturday in holiday_singleton_dates
+                sun_is_holiday = sunday in holiday_singleton_dates
+                
+                if sat_is_holiday or sun_is_holiday:
+                    # Allow separate assignment for holiday days
+                    if sat_shift == ShiftType.OFF.value:
+                        x_single[p_idx, w_idx, 'sat'] = model.NewBoolVar(f"unit_single_sat_{p_idx}_{w_idx}")
+                    if sun_shift == ShiftType.OFF.value:
+                        x_single[p_idx, w_idx, 'sun'] = model.NewBoolVar(f"unit_single_sun_{p_idx}_{w_idx}")
+                else:
+                    # Normal weekend - must work both days
+                    if sat_shift == ShiftType.OFF.value and sun_shift == ShiftType.OFF.value:
+                        x[p_idx, w_idx] = model.NewBoolVar(f"unit_weekend_{p_idx}_{w_idx}")
+        
+        # HARD CONSTRAINT: Exactly 1 registrar per day
+        for w_idx, (saturday, sunday) in enumerate(all_weekends):
+            sat_is_holiday = saturday in holiday_singleton_dates
+            sun_is_holiday = sunday in holiday_singleton_dates
+            
+            if sat_is_holiday or sun_is_holiday:
+                # Holiday weekend - coverage per individual day
+                sat_coverage = [x.get((p_idx, w_idx), 0) for p_idx, _ in registrars]
+                sat_coverage += [x_single.get((p_idx, w_idx, 'sat'), 0) for p_idx, _ in registrars]
+                model.Add(sum(sat_coverage) == 1)
+                
+                sun_coverage = [x.get((p_idx, w_idx), 0) for p_idx, _ in registrars]
+                sun_coverage += [x_single.get((p_idx, w_idx, 'sun'), 0) for p_idx, _ in registrars]
+                model.Add(sum(sun_coverage) == 1)
+            else:
+                # Normal weekend - one person covers both days
+                available = [p_idx for p_idx, _ in registrars if (p_idx, w_idx) in x]
+                if available:
+                    model.Add(sum(x[p_idx, w_idx] for p_idx in available) == 1)
+        
+        # CONTINUITY SHORT DAYS: Add decision variables for Friday or Monday short days
+        # y_fri[p_idx, w_idx] = 1 if person gets Friday short day for this weekend
+        # y_mon[p_idx, w_idx] = 1 if person gets Monday short day for this weekend
+        y_fri = {}
+        y_mon = {}
+        
+        for p_idx, person in registrars:
+            for w_idx, (saturday, sunday) in enumerate(all_weekends):
+                # Check Friday and Monday availability
+                friday = saturday - timedelta(days=1)
+                monday = sunday + timedelta(days=1)
+                
+                if friday in self.days:
+                    fri_str = friday.isoformat()
+                    fri_shift = self.partial_roster[fri_str][person.id]
+                    if fri_shift == ShiftType.OFF.value and (p_idx, w_idx) in x:
+                        y_fri[p_idx, w_idx] = model.NewBoolVar(f"continuity_fri_{p_idx}_{w_idx}")
+                
+                if monday in self.days:
+                    mon_str = monday.isoformat()
+                    mon_shift = self.partial_roster[mon_str][person.id]
+                    if mon_shift == ShiftType.OFF.value and (p_idx, w_idx) in x:
+                        y_mon[p_idx, w_idx] = model.NewBoolVar(f"continuity_mon_{p_idx}_{w_idx}")
+        
+        # CONSTRAINT: If person works weekend, they get EXACTLY ONE continuity day (Fri XOR Mon)
+        for p_idx, person in registrars:
+            for w_idx in range(len(all_weekends)):
+                if (p_idx, w_idx) in x:
+                    works_weekend = x[p_idx, w_idx]
+                    has_fri = y_fri.get((p_idx, w_idx), 0)
+                    has_mon = y_mon.get((p_idx, w_idx), 0)
+                    
+                    # If works weekend, must have exactly 1 continuity day
+                    model.Add(has_fri + has_mon == 1).OnlyEnforceIf(works_weekend)
+                    model.Add(has_fri + has_mon == 0).OnlyEnforceIf(works_weekend.Not())
+        
+        # FAIRNESS: Minimize max weekend blocks (WTE-adjusted)
+        # Count weekend blocks: normal weekends (2-day) + holiday singletons
+        max_weekends = model.NewIntVar(0, len(all_weekends) * 100, 'max_unit_weekends')
+        
+        for p_idx, person in registrars:
+            # Count normal weekend blocks
+            weekend_blocks = sum(x.get((p_idx, w_idx), 0) for w_idx in range(len(all_weekends)))
+            
+            # Count holiday singletons (each singleton = 1 "weekend" for fairness)
+            holiday_singletons = sum(x_single.get((p_idx, w_idx, day), 0) 
+                                    for w_idx in range(len(all_weekends))
+                                    for day in ['sat', 'sun'])
+            
+            total_weekends = weekend_blocks + holiday_singletons
+            
+            # WTE-adjust: scale by 100/wte for integer math
+            wte_scale = int(100 / person.wte)
+            wte_adjusted_load = total_weekends * wte_scale
+            model.Add(max_weekends >= wte_adjusted_load)
+        
+        # Minimize maximum load
+        model.Minimize(max_weekends)
+        
+        # Solve
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = timeout_seconds
+        solver.parameters.relative_gap_limit = 0.05
+        status = solver.Solve(model)
+        
+        if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
+            for p_idx, person in registrars:
+                # Assign weekend blocks
+                for w_idx, (saturday, sunday) in enumerate(all_weekends):
+                    if (p_idx, w_idx) in x and solver.Value(x[p_idx, w_idx]) == 1:
+                        sat_str = saturday.isoformat()
+                        sun_str = sunday.isoformat()
+                        
+                        self.partial_roster[sat_str][person.id] = ShiftType.LONG_DAY_REG.value
+                        self.partial_roster[sun_str][person.id] = ShiftType.LONG_DAY_REG.value
+                        
+                        assignments.add((p_idx, self.days.index(saturday), ShiftType.LONG_DAY_REG))
+                        assignments.add((p_idx, self.days.index(sunday), ShiftType.LONG_DAY_REG))
+                        
+                        # Assign continuity short day
+                        friday = saturday - timedelta(days=1)
+                        monday = sunday + timedelta(days=1)
+                        
+                        if (p_idx, w_idx) in y_fri and solver.Value(y_fri[p_idx, w_idx]) == 1:
+                            fri_str = friday.isoformat()
+                            self.partial_roster[fri_str][person.id] = ShiftType.SHORT_DAY.value
+                            assignments.add((p_idx, self.days.index(friday), ShiftType.SHORT_DAY))
+                            continuity_day = "Fri"
+                        elif (p_idx, w_idx) in y_mon and solver.Value(y_mon[p_idx, w_idx]) == 1:
+                            mon_str = monday.isoformat()
+                            self.partial_roster[mon_str][person.id] = ShiftType.SHORT_DAY.value
+                            assignments.add((p_idx, self.days.index(monday), ShiftType.SHORT_DAY))
+                            continuity_day = "Mon"
+                        else:
+                            continuity_day = "none"
+                        
+                        print(f"  ✅ {person.name}: Unit weekend {saturday.strftime('%Y-%m-%d')} - {sunday.strftime('%Y-%m-%d')} + {continuity_day} short day")
+                
+                # Assign holiday singletons
+                for w_idx, (saturday, sunday) in enumerate(all_weekends):
+                    if (p_idx, w_idx, 'sat') in x_single and solver.Value(x_single[p_idx, w_idx, 'sat']) == 1:
+                        sat_str = saturday.isoformat()
+                        self.partial_roster[sat_str][person.id] = ShiftType.LONG_DAY_REG.value
+                        assignments.add((p_idx, self.days.index(saturday), ShiftType.LONG_DAY_REG))
+                        print(f"  ✅ {person.name}: Holiday singleton {saturday.strftime('%Y-%m-%d')} (Sat)")
+                    
+                    if (p_idx, w_idx, 'sun') in x_single and solver.Value(x_single[p_idx, w_idx, 'sun']) == 1:
+                        sun_str = sunday.isoformat()
+                        self.partial_roster[sun_str][person.id] = ShiftType.LONG_DAY_REG.value
+                        assignments.add((p_idx, self.days.index(sunday), ShiftType.LONG_DAY_REG))
+                        print(f"  ✅ {person.name}: Holiday singleton {sunday.strftime('%Y-%m-%d')} (Sun)")
+        else:
+            print(f"  ⚠️ Solver status: {solver.StatusName(status)}")
+        
+        return assignments
+    
+    def _calculate_weekend_blocks_worked(self) -> Dict[str, int]:
+        """Calculate number of weekend blocks worked by each person."""
+        weekend_counts = {person.id: 0 for person in self.people}
+        
+        # Count Sat-Sun blocks
+        for day in self.days:
+            if day.weekday() == 5:  # Saturday
+                sunday = day + timedelta(days=1)
+                if sunday in self.days:
+                    sat_str = day.isoformat()
+                    sun_str = sunday.isoformat()
+                    
+                    for person_id in weekend_counts.keys():
+                        sat_shift = self.partial_roster[sat_str][person_id]
+                        sun_shift = self.partial_roster[sun_str][person_id]
+                        
+                        # Count if worked weekend long day on both days OR holiday singleton
+                        worked_weekend = False
+                        if sat_shift in [ShiftType.LONG_DAY_REG.value, ShiftType.COMET_DAY.value]:
+                            if sun_shift in [ShiftType.LONG_DAY_REG.value, ShiftType.COMET_DAY.value]:
+                                # Normal weekend block
+                                worked_weekend = True
+                            else:
+                                # Holiday singleton Saturday
+                                worked_weekend = True
+                        elif sun_shift in [ShiftType.LONG_DAY_REG.value, ShiftType.COMET_DAY.value]:
+                            # Holiday singleton Sunday
+                            worked_weekend = True
+                        
+                        if worked_weekend:
+                            weekend_counts[person_id] += 1
+        
+        return weekend_counts
     
     def _count_existing_holiday_work(self) -> Dict[str, int]:
         """Count holiday work already assigned (nights on bank holidays)."""
