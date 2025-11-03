@@ -1401,53 +1401,28 @@ class SequentialSolver:
         return True
     
     def _assign_unit_night_blocks_with_cpsat(self, unit_night_days, unit_night_eligible, running_totals, timeout_seconds=120):
-        """Use CP-SAT week-by-week to assign unit nights with rest constraints and natural block formation.
+        """Use CP-SAT to assign unit nights for FULL PERIOD with hard gap constraints.
         
-        This uses a hybrid approach:
-        - Process weeks sequentially (like greedy)
-        - Within each week, use CP-SAT to find optimal 2-4 night blocks
-        - Enforces 46h rest rule rigorously
-        - Natural block formation from week-focused assignment
+        Full-period optimization approach:
+        - Process ALL unit night days in one CP-SAT solve
+        - Hard 7-day minimum gap constraints eliminate 2-6 day gaps
+        - Global optimization for fairness and block quality
+        - 5% relative gap stopping for reasonable solve times
         """
-        
-        # print("\n🔧 Using CP-SAT week-by-week solver for unit nights")
-        # print(f"   Days to cover: {len(unit_night_days)}")
-        # print(f"   Registrars available: {len(unit_night_eligible)}")
         
         # Build a mapping of all days to check rest constraints
         day_to_idx_map = {day: idx for idx, day in enumerate(self.days)}
         
-        # Process in 3-week chunks to allow proper block formation
-        # (single weeks are too constrained after rest rules eliminate options)
-        start_date = unit_night_days[0] if unit_night_days else self.config.start_date
-        current_chunk_start = start_date
-        chunks_processed = 0
-        blocks_formed = 0
+        # FULL PERIOD SOLVE - no chunking
+        # This allows hard gap constraints to work across entire roster
+        blocks_formed = self._assign_multichunk_unit_nights_cpsat(
+            unit_night_days,  # ALL days, not chunked
+            unit_night_eligible, 
+            running_totals, 
+            day_to_idx_map, 
+            timeout_seconds=timeout_seconds  # Use full timeout
+        )
         
-        CHUNK_WEEKS = 3  # Process 3 weeks at a time for better block opportunities
-        
-        while current_chunk_start <= unit_night_days[-1] if unit_night_days else self.config.end_date:
-            # Get unit nights for next N weeks
-            chunk_end = current_chunk_start + timedelta(days=7 * CHUNK_WEEKS - 1)
-            chunk_unit_nights = [day for day in unit_night_days 
-                                if current_chunk_start <= day <= chunk_end]
-            
-            if not chunk_unit_nights:
-                current_chunk_start += timedelta(days=7 * CHUNK_WEEKS)
-                continue
-            
-            # print(f"\n📦 Processing chunk {chunks_processed + 1}: {current_chunk_start} to {chunk_end} ({len(chunk_unit_nights)} nights)")
-            
-            # Use CP-SAT to assign this chunk's nights as blocks
-            blocks_this_chunk = self._assign_multichunk_unit_nights_cpsat(
-                chunk_unit_nights, unit_night_eligible, running_totals, day_to_idx_map, timeout_seconds=60
-            )
-            
-            blocks_formed += blocks_this_chunk
-            chunks_processed += 1
-            current_chunk_start += timedelta(days=7 * CHUNK_WEEKS)
-        
-        # print(f"\n📅 Processed {chunks_processed} chunks, formed {blocks_formed} blocks")
         return True
     
     def _calculate_days_since_last_block(self, person_id, current_day, day_to_idx_map):
