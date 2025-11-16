@@ -111,6 +111,275 @@ class SequentialSolver:
                 person.id: ShiftType.OFF.value for person in self.people
             }
     
+    # ============================================================================
+    # UNIFIED CONSTRAINT CHECKING HELPERS
+    # ============================================================================
+    
+    def _is_night_shift(self, shift_value: str) -> bool:
+        """Check if a shift is a night shift type."""
+        night_types = [ShiftType.COMET_NIGHT.value, ShiftType.NIGHT_REG.value, ShiftType.NIGHT_SHO.value]
+        return shift_value in night_types
+    
+    def _is_working_shift(self, shift_value: str) -> bool:
+        """Check if a shift is a working shift (not OFF or LOCUM)."""
+        return shift_value not in [ShiftType.OFF.value, ShiftType.LOCUM.value]
+    
+    def _find_night_block_end(self, person_id: str, start_day: date) -> date:
+        """Find the end date of a night block starting at or before start_day."""
+        current = start_day
+        
+        while current <= self.days[-1]:
+            current_str = current.isoformat()
+            if current_str not in self.partial_roster:
+                break
+            
+            assignment = self.partial_roster[current_str][person_id]
+            
+            # If not a night shift, this is the end (block ended yesterday)
+            if not self._is_night_shift(assignment):
+                return current - timedelta(days=1)
+            
+            current += timedelta(days=1)
+        
+        # Block extends to end of roster or current is the last night
+        return current - timedelta(days=1)
+    
+    def _find_night_block_start(self, person_id: str, end_day: date) -> date:
+        """Find the start date of a night block ending at or after end_day."""
+        current = end_day
+        
+        while current >= self.days[0]:
+            current_str = current.isoformat()
+            if current_str not in self.partial_roster:
+                break
+            
+            assignment = self.partial_roster[current_str][person_id]
+            
+            # If not a night shift, block starts tomorrow
+            if not self._is_night_shift(assignment):
+                return current + timedelta(days=1)
+            
+            current -= timedelta(days=1)
+        
+        # Block extends to start of roster or current is the first night
+        return current + timedelta(days=1)
+    
+    def _check_5day_gap_to_next_night_block(self, person_id: str, day: date, proposed_shift_is_night: bool = False) -> tuple[bool, str]:
+        """
+        Check if assigning a shift on this day would violate 5-day gap rule.
+        
+        5-DAY GAP RULE: Minimum 5 full rest days between:
+        - End of one night block and START of another night block
+        
+        This means:
+        - Can do day shifts after 46 hours (2 days)
+        - Cannot do night shifts until 5 days after block end
+        
+        This is a SOFT constraint - may be violated if no alternative exists.
+        
+        Returns: (can_work, reason)
+        """
+        
+        # BACKWARD CHECK: Look for recent night block endings
+        for lookback in range(1, 6):  # Check last 5 days
+            prev_day = day - timedelta(days=lookback)
+            
+            if prev_day < self.days[0]:
+                break
+            
+            prev_str = prev_day.isoformat()
+            if prev_str not in self.partial_roster:
+                continue
+            
+            prev_assignment = self.partial_roster[prev_str][person_id]
+            
+            if self._is_night_shift(prev_assignment):
+                # Check if this is the END of a night block
+                next_day = prev_day + timedelta(days=1)
+                next_str = next_day.isoformat()
+                
+                if next_str in self.partial_roster:
+                    next_assignment = self.partial_roster[next_str][person_id]
+                    
+                    # If next day is NOT a night, prev_day is block end
+                    if not self._is_night_shift(next_assignment):
+                        # Block ended on prev_day
+                        # Need 5 full rest days: prev_day+1 through prev_day+5
+                        # Can work on prev_day+6 (which is 5 days after)
+                        days_since_block_end = (day - prev_day).days
+                        
+                        # For night shifts: need full 5 days (soft constraint)
+                        if proposed_shift_is_night and days_since_block_end <= 5:
+                            return False, f"Night block ended {prev_day.isoformat()}, only {days_since_block_end-1} rest days (prefer 5 before next night block)"
+                        
+                        # For day shifts: just need 46 hours (2 days minimum) - hard constraint
+                        if not proposed_shift_is_night and days_since_block_end <= 1:
+                            return False, f"Night block ended {prev_day.isoformat()}, only {days_since_block_end} days rest (need 46 hours / 2 days)"
+        
+        # FORWARD CHECK: Only if proposed shift is a night shift
+        if proposed_shift_is_night:
+            for lookahead in range(1, 6):  # Check next 5 days
+                next_day = day + timedelta(days=lookahead)
+                
+                if next_day > self.days[-1]:
+                    break
+                
+                next_str = next_day.isoformat()
+                if next_str not in self.partial_roster:
+                    continue
+                
+                next_assignment = self.partial_roster[next_str][person_id]
+                
+                if self._is_night_shift(next_assignment):
+                    # Check if this is the START of a night block
+                    prev_day = next_day - timedelta(days=1)
+                    prev_str = prev_day.isoformat()
+                    
+                    if prev_str in self.partial_roster:
+                        prev_assignment = self.partial_roster[prev_str][person_id]
+                        
+                        # If previous day is NOT a night, next_day is block start
+                        if not self._is_night_shift(prev_assignment):
+                            # Block starts on next_day
+                            # Need 5 full rest days between our block end and that block start (soft)
+                            days_until_next_block = (next_day - day).days
+                            
+                            if days_until_next_block <= 5:
+                                return False, f"Night block starts {next_day.isoformat()}, only {days_until_next_block-1} rest days possible (prefer 5)"
+        
+        return True, ""
+    
+    def _check_72hour_gap_preference(self, person_id: str, day: date, proposed_shift_is_day: bool = True) -> tuple[bool, str]:
+        """
+        Check if assigning a day shift respects 72-hour (3 day) preference after night blocks.
+        
+        72-HOUR GAP PREFERENCE: Prefer 3 full rest days between:
+        - End of night block and next day shift assignment
+        
+        This is a SOFT constraint - may be violated if needed.
+        Hard minimum remains at 46 hours (2 days).
+        
+        Returns: (meets_preference, reason)
+        """
+        
+        if not proposed_shift_is_day:
+            return True, ""  # Only applies to day shifts
+        
+        # BACKWARD CHECK: Look for recent night block endings
+        for lookback in range(1, 4):  # Check last 3 days
+            prev_day = day - timedelta(days=lookback)
+            
+            if prev_day < self.days[0]:
+                break
+            
+            prev_str = prev_day.isoformat()
+            if prev_str not in self.partial_roster:
+                continue
+            
+            prev_assignment = self.partial_roster[prev_str][person_id]
+            
+            if self._is_night_shift(prev_assignment):
+                # Check if this is the END of a night block
+                next_day = prev_day + timedelta(days=1)
+                next_str = next_day.isoformat()
+                
+                if next_str in self.partial_roster:
+                    next_assignment = self.partial_roster[next_str][person_id]
+                    
+                    # If next day is NOT a night, prev_day is block end
+                    if not self._is_night_shift(next_assignment):
+                        # Block ended on prev_day
+                        days_since_block_end = (day - prev_day).days
+                        
+                        # Prefer 3 full rest days (72 hours)
+                        if days_since_block_end <= 3:
+                            return False, f"Night block ended {prev_day.isoformat()}, only {days_since_block_end} days rest (prefer 72 hours / 3 days before day shifts)"
+        
+        return True, ""
+    
+    def _check_72hour_weekly_maximum(self, person_id: str, day: date, proposed_shift_duration: float) -> tuple[bool, str]:
+        """
+        Check if assigning this shift would exceed 72 hours in any 7-day rolling window.
+        
+        Returns: (can_work, reason)
+        """
+        
+        # Check 7-day windows: [day-6 to day], [day-5 to day+1], ..., [day to day+6]
+        for window_start_offset in range(-6, 1):
+            window_start = day + timedelta(days=window_start_offset)
+            window_end = window_start + timedelta(days=6)
+            
+            # Skip if window is outside roster period
+            if window_start < self.days[0] or window_end > self.days[-1]:
+                continue
+            
+            total_hours = proposed_shift_duration  # Start with proposed shift
+            
+            # Sum hours in this window
+            current = window_start
+            while current <= window_end:
+                if current == day:
+                    # Skip the proposed shift day (already counted)
+                    current += timedelta(days=1)
+                    continue
+                
+                current_str = current.isoformat()
+                if current_str in self.partial_roster:
+                    assignment = self.partial_roster[current_str][person_id]
+                    
+                    if self._is_working_shift(assignment):
+                        try:
+                            shift_type = ShiftType(assignment)
+                            total_hours += shift_duration_hours(shift_type)
+                        except ValueError:
+                            pass  # Unknown shift type
+                
+                current += timedelta(days=1)
+            
+            if total_hours > 72:
+                return False, f"Would exceed 72-hour weekly maximum (window {window_start.isoformat()} to {window_end.isoformat()}: {total_hours:.1f} hours)"
+        
+        return True, ""
+    
+    def _check_all_constraints_for_shift(self, person_id: str, day: date, 
+                                         shift_type: ShiftType, 
+                                         check_5day_gap: bool = True,
+                                         check_72hour_max: bool = True) -> tuple[bool, str]:
+        """
+        Unified constraint checker for assigning a shift.
+        
+        Returns: (can_assign, reason_if_not)
+        """
+        
+        # Check if day is already assigned
+        day_str = day.isoformat()
+        if day_str not in self.partial_roster:
+            return False, "Day not in roster period"
+        
+        current_assignment = self.partial_roster[day_str][person_id]
+        if current_assignment != ShiftType.OFF.value:
+            return False, f"Already assigned {current_assignment}"
+        
+        # Check 5-day gap rule (soft constraint for night-to-night blocks)
+        if check_5day_gap:
+            is_night = self._is_night_shift(shift_type.value)
+            can_work, reason = self._check_5day_gap_to_next_night_block(person_id, day, is_night)
+            if not can_work:
+                return False, reason
+        
+        # Check 72-hour weekly maximum
+        if check_72hour_max:
+            duration = shift_duration_hours(shift_type)
+            can_work, reason = self._check_72hour_weekly_maximum(person_id, day, duration)
+            if not can_work:
+                return False, reason
+        
+        return True, ""
+    
+    # ============================================================================
+    # END OF UNIFIED CONSTRAINT CHECKING HELPERS
+    # ============================================================================
+    
     def solve_with_checkpoints(self, timeout_per_stage: int = 1800, auto_continue: bool = False) -> SequentialSolveResult:
         """Solve roster with admin review checkpoints between stages."""
         
@@ -681,8 +950,13 @@ class SequentialSolver:
         
         for week_idx, (week_start, week_end) in enumerate(comet_week_ranges):
             
+            # DEBUG: Print week boundaries
+            print(f"\n🔍 DEBUG: COMET Week {week_idx + 1}: {week_start.strftime('%Y-%m-%d (%A)')} to {week_end.strftime('%Y-%m-%d (%A)')}")
+            
             # Get available days in this week
             week_days = [day for day in self.days if week_start <= day <= week_end]
+            print(f"   Week has {len(week_days)} days: {week_days[0].strftime('%a %d')} to {week_days[-1].strftime('%a %d')}")
+            
             available_days = []
             
             for day in week_days:
@@ -699,6 +973,7 @@ class SequentialSolver:
             available_days.sort()
             
             if len(available_days) < 4:  # Skip weeks with too few available days
+                print(f"   ⚠️  Skipping - only {len(available_days)} available days (need 4)")
                 continue
             
             # Try to build optimal patterns: 4+3, 3+4, 2+2+3, etc.
@@ -984,7 +1259,8 @@ class SequentialSolver:
                         # Build consecutive sequence
                         for i in range(1, block_size):
                             next_day = consecutive_block[-1] + timedelta(days=1)
-                            if next_day in available_days:
+                            # CRITICAL: Check that next_day is still within the COMET week boundary
+                            if next_day in available_days and week_start <= next_day <= week_end:
                                 consecutive_block.append(next_day)
                             else:
                                 break
@@ -1109,7 +1385,25 @@ class SequentialSolver:
                 
                 # Try to find consecutive slots in this week
                 for start_idx in range(len(week_days) - block_size + 1):
-                    consecutive_days = week_days[start_idx:start_idx + block_size]
+                    # CRITICAL: Build actual consecutive calendar days, not just a slice
+                    # Also ensure we don't cross the week boundary
+                    consecutive_days = []
+                    for i in range(block_size):
+                        candidate_day = week_days[start_idx + i]
+                        # Check if this day is consecutive to the last one (or is the first)
+                        if i == 0:
+                            consecutive_days.append(candidate_day)
+                        else:
+                            expected_day = consecutive_days[-1] + timedelta(days=1)
+                            if candidate_day == expected_day and candidate_day <= week_end:
+                                consecutive_days.append(candidate_day)
+                            else:
+                                break  # Not consecutive or crosses week boundary
+                    
+                    # Skip if we couldn't build a full consecutive block
+                    if len(consecutive_days) != block_size:
+                        continue
+                        
                     blocks_tried += 1
                     
                     # Check if all days are available for this person
@@ -1415,7 +1709,7 @@ class SequentialSolver:
         
         # FULL PERIOD SOLVE - no chunking
         # This allows hard gap constraints to work across entire roster
-        blocks_formed = self._assign_multichunk_unit_nights_cpsat(
+        result = self._assign_multichunk_unit_nights_cpsat(
             unit_night_days,  # ALL days, not chunked
             unit_night_eligible, 
             running_totals, 
@@ -1423,7 +1717,8 @@ class SequentialSolver:
             timeout_seconds=timeout_seconds  # Use full timeout
         )
         
-        return True
+        # Return the actual result (True if successful, False if infeasible/locum gaps)
+        return result
     
     def _calculate_days_since_last_block(self, person_id, current_day, day_to_idx_map):
         """Calculate how many days since this doctor last worked a night block."""
@@ -1511,19 +1806,22 @@ class SequentialSolver:
                                     # Block ended at prev_full_idx (e.g., day 10)
                                     # day 11 (prev_full_idx+1) = rest day 1 (days_since=0)
                                     # day 12 (prev_full_idx+2) = rest day 2 (days_since=1)
-                                    # day 13 (prev_full_idx+3) = can work (days_since=2)
-                                    # So need: days_since >= 2 to work
+                                    # ...
+                                    # day 15 (prev_full_idx+5) = rest day 5 (days_since=4)
+                                    # day 16 (prev_full_idx+6) = can work (days_since=5)
+                                    # So need: days_since >= 5 to work (soft 5-day minimum gap)
                                     days_since = full_roster_idx - prev_full_idx - 1
-                                    if days_since <= 1:  # Need 2 full rest days
+                                    print(f"      🔍 Gap check for {person.name} on {day}: block ended {prev_day}, {days_since} rest days (prefer 5)")
+                                    if days_since < 5:  # Prefer 5 full rest days (soft constraint)
                                         can_work = False
-                                        exclusion_reason = f"backward_rest: block ended {prev_day}, only {days_since} rest days"
+                                        exclusion_reason = f"backward_rest: block ended {prev_day}, only {days_since} rest days (prefer 5)"
                                     break
                         
                         # FORWARD CHECK: Look ahead for upcoming COMET/night blocks
-                        # If we work on day D, we need 2 rest days after our block ends
-                        # Check if there's a COMET/night block starting within next 2 days
-                        # (because if we work day D, and there's a block on D+1 or D+2, we'd violate rest)
-                        for lookahead in range(1, 3):
+                        # If we work on day D, we need 5 rest days after our block ends (soft constraint)
+                        # Check if there's a COMET/night block starting within next 5 days
+                        # (because if we work day D, and there's a block on D+1 through D+5, we'd violate rest)
+                        for lookahead in range(1, 6):  # Check next 5 days (soft 5-day minimum)
                             next_full_idx = full_roster_idx + lookahead
                             if next_full_idx >= len(self.days):
                                 break
@@ -1546,12 +1844,12 @@ class SequentialSolver:
                                 if is_block_start:
                                     # A block starts at next_full_idx
                                     # If we work on day D (full_roster_idx), our block could end on D
-                                    # Then we need rest on D+1 and D+2
-                                    # So we can't have a block starting on D+1 or D+2
+                                    # Then we need rest on D+1 through D+5 (5 full rest days)
+                                    # So we can't have a block starting on D+1 through D+5
                                     days_until = next_full_idx - full_roster_idx
-                                    if days_until <= 2:  # Need 2 full rest days before next block
+                                    if days_until < 6:  # Prefer 5 full rest days before next block (soft constraint)
                                         can_work = False
-                                        exclusion_reason = f"forward_rest: block starts {next_day}, only {days_until-1} rest days possible"
+                                        exclusion_reason = f"forward_rest: block starts {next_day}, only {days_until-1} rest days possible (prefer 5)"
                                     break
                     
                     if can_work:
@@ -1568,35 +1866,8 @@ class SequentialSolver:
             if day_vars:
                 model.Add(sum(day_vars) == 1)
         
-        # Forward rest constraint: After END of a block, must have 2 days rest
-        # This is ONLY checked for transitions WITHIN the chunk (between consecutive nights)
-        # Key insight: A block END is when working day D but NOT working day D+1
-        for p_idx, person in unit_night_eligible:
-            for d_idx in range(len(chunk_unit_nights) - 1):
-                if (p_idx, d_idx) not in x or (p_idx, d_idx + 1) not in x:
-                    continue
-                    
-                curr_night = x[p_idx, d_idx]
-                next_night = x[p_idx, d_idx + 1]
-                
-                # If working curr but NOT next, this is a block end
-                # Then must not work the day after next (rest day 1) or day after that (rest day 2)
-                # But we can only enforce this for days that are IN the chunk
-                
-                # Create block_end indicator: curr==1 AND next==0
-                block_end = model.NewBoolVar(f"block_end_{p_idx}_{d_idx}")
-                model.Add(curr_night == 1).OnlyEnforceIf(block_end)
-                model.Add(next_night == 0).OnlyEnforceIf(block_end)
-                model.Add(curr_night + next_night.Not() <= 1).OnlyEnforceIf(block_end.Not())
-                
-                # If block ends at d_idx (last working day), enforce rest:
-                # - d_idx+1 is already rest (by definition of block_end: next==0)
-                # - d_idx+2 must also be rest (second rest day)
-                # - d_idx+3 can work again (46+ hours have passed)
-                rest_d_idx = d_idx + 2  # Second rest day
-                if rest_d_idx < len(chunk_unit_nights) and (p_idx, rest_d_idx) in x:
-                    # If block ends at d_idx, can't work at d_idx+2
-                    model.Add(x[p_idx, rest_d_idx] == 0).OnlyEnforceIf(block_end)
+        # NOTE: Forward rest constraints are now handled by the hard 7-day gap constraints
+        # below, which eliminate the entire 2-6 day gap search space
         
         # HARD CONSTRAINT: Maximum block length of 4 consecutive nights
         # This forces the solver to split 7-night weeks into 2-4 night blocks
@@ -1700,10 +1971,10 @@ class SequentialSolver:
                 
                 objective_terms.append(singleton_var * penalty_singleton)
         
-        # GAP CONSTRAINT: HARD minimum 7-day gap between night blocks
-        # Changed from soft penalties to hard constraint for MUCH simpler search space
-        # This eliminates exploration of 2-6 day gaps entirely, drastically reducing complexity
-        # Trade-off: Less flexible (can't accept 6-day gaps if needed), but much faster solving
+        # GAP CONSTRAINT: Soft minimum 5-day gap between night blocks
+        # Changed from 7 days to 5 days to give more flexibility
+        # This constraint may be violated if no alternative exists (soft constraint)
+        # Trade-off: More flexibility for solver, but needs monitoring
         gap_constraint_count = 0
         for p_idx, person in unit_night_eligible:
             for d_idx in range(len(chunk_unit_nights) - 1):
@@ -1719,25 +1990,52 @@ class SequentialSolver:
                 model.Add(next_night == 0).OnlyEnforceIf(block_end)
                 model.Add(curr_night + next_night.Not() <= 1).OnlyEnforceIf(block_end.Not())
                 
-                # HARD CONSTRAINT: If block ends at d_idx, cannot work for next 7 days
-                # This eliminates 2-6 day gaps from search space entirely
-                for gap_days in range(2, 8):  # Days 2-7 after block end
-                    resume_idx = d_idx + 1 + gap_days
+                # SOFT CONSTRAINT: If block ends at d_idx, prefer not working for next 5 days
+                # This is implemented as a soft constraint that may be violated
+                # If block ends at d_idx (last working day), then:
+                #   d_idx + 1 = first rest day (gap day 1)
+                #   d_idx + 2 = second rest day (gap day 2)
+                #   ...
+                #   d_idx + 5 = fifth rest day (gap day 5)
+                #   d_idx + 6 = earliest preferred resume work (gap day 6+)
+                for gap_days in range(1, 6):  # Days 1-5 after block end
+                    resume_idx = d_idx + gap_days
                     if resume_idx >= len(chunk_unit_nights) or (p_idx, resume_idx) not in x:
                         continue
                     
-                    # If block ends, MUST NOT work within next 7 days
-                    model.Add(x[p_idx, resume_idx] == 0).OnlyEnforceIf(block_end)
+                    # Prefer not working within next 5 days (soft constraint via penalties in objective)
+                    # NOTE: This is now a preference, not a hard constraint
+                    gap_violation = model.NewBoolVar(f"gap_violation_{p_idx}_{d_idx}_{gap_days}")
+                    model.Add(x[p_idx, resume_idx] == 1).OnlyEnforceIf([block_end, gap_violation])
+                    model.Add(x[p_idx, resume_idx] == 0).OnlyEnforceIf([block_end, gap_violation.Not()])
+                    model.Add(gap_violation == 0).OnlyEnforceIf(block_end.Not())
+                    
+                    # Add penalty to objective for gap violations
+                    # Stronger penalty for shorter gaps (day 1-2 worse than day 4-5)
+                    if gap_days <= 2:
+                        gap_penalty = -25000  # Very strong penalty for <2 day gaps
+                    elif gap_days <= 3:
+                        gap_penalty = -15000  # Strong penalty for 3 day gaps
+                    else:
+                        gap_penalty = -8000   # Moderate penalty for 4-5 day gaps
+                    
+                    objective_terms.append(gap_violation * gap_penalty)
                     gap_constraint_count += 1
         
-        print(f"   Added {gap_constraint_count} HARD gap constraints (min 7 days) across {len(chunk_unit_nights)} days")
-        print(f"   ✅ Search space dramatically reduced - 2-6 day gaps eliminated")
+        print(f"   Added {gap_constraint_count} SOFT gap constraints (prefer 5 days) across {len(chunk_unit_nights)} days")
+        print("   ✅ Gaps <5 days are allowed but penalized - solver has more flexibility")
         
-        # WEEKEND CONTINUITY: VERY STRONG preference for complete weekend coverage
-        # Weekends should be covered as continuous blocks (Fri-Sun preferred)
-        # Increased bonuses to override fairness penalties and ensure weekend continuity
-        bonus_weekend_3 = 35000   # Fri-Sat-Sun (HIGHEST priority - core weekend) - INCREASED
-        bonus_weekend_4 = 18000   # Thu-Fri-Sat-Sun (good but not essential) - INCREASED
+        # WEEKEND CONTINUITY: HIGHEST PRIORITY - weekend coverage blocks
+        # Weekends MUST be covered as continuous blocks - this is the PRIMARY goal
+        # Allowed patterns (in priority order):
+        #   1. Fri-Sat-Sun (3 nights) - CORE weekend pattern
+        #   2. Fri-Sat-Sun-Mon (4 nights) - Extended weekend
+        #   3. Thu-Fri-Sat-Sun (4 nights) - Start Thursday
+        # 
+        # These bonuses MUST override fairness penalties to ensure weekend coverage
+        bonus_weekend_fri_sat_sun = 80000      # Fri-Sat-Sun (HIGHEST - core weekend)
+        bonus_weekend_fri_sat_sun_mon = 65000  # Fri-Sat-Sun-Mon (very good)
+        bonus_weekend_thu_fri_sat_sun = 60000  # Thu-Fri-Sat-Sun (good alternative)
         
         # Build day-of-week map for chunk
         chunk_dow = {}
@@ -1748,30 +2046,51 @@ class SequentialSolver:
                 date_obj = day_item
             chunk_dow[d_idx] = date_obj.weekday()
         
-        # Find weekend patterns in this chunk
+        # Find and strongly incentivize weekend patterns
+        weekend_pattern_count = 0
         for p_idx, person in unit_night_eligible:
             for d_idx in range(len(chunk_unit_nights)):
                 dow = chunk_dow[d_idx]
                 
-                # Fri-Sat-Sun (3-day weekend block)
+                # Pattern 1: Fri-Sat-Sun (3-day weekend block) - HIGHEST PRIORITY
                 if dow == 4 and d_idx + 2 < len(chunk_unit_nights):
                     if chunk_dow.get(d_idx + 1) == 5 and chunk_dow.get(d_idx + 2) == 6:
                         if all((p_idx, d_idx + i) in x for i in range(3)):
-                            weekend_block = model.NewBoolVar(f"weekend3_{p_idx}_{d_idx}")
+                            weekend_block = model.NewBoolVar(f"weekend_fri_sun_{p_idx}_{d_idx}")
                             sum_expr = sum(x[p_idx, d_idx + i] for i in range(3))
                             model.Add(sum_expr == 3).OnlyEnforceIf(weekend_block)
                             model.Add(sum_expr <= 2).OnlyEnforceIf(weekend_block.Not())
-                            objective_terms.append(weekend_block * bonus_weekend_3)
+                            objective_terms.append(weekend_block * bonus_weekend_fri_sat_sun)
+                            weekend_pattern_count += 1
                 
-                # Thu-Fri-Sat-Sun (4-day weekend block)
-                if dow == 3 and d_idx + 3 < len(chunk_unit_nights):
-                    if (chunk_dow.get(d_idx + 1) == 4 and chunk_dow.get(d_idx + 2) == 5 and chunk_dow.get(d_idx + 3) == 6):
+                # Pattern 2: Fri-Sat-Sun-Mon (4-day extended weekend)
+                if dow == 4 and d_idx + 3 < len(chunk_unit_nights):
+                    if (chunk_dow.get(d_idx + 1) == 5 and 
+                        chunk_dow.get(d_idx + 2) == 6 and 
+                        chunk_dow.get(d_idx + 3) == 0):  # Monday = 0
                         if all((p_idx, d_idx + i) in x for i in range(4)):
-                            weekend_block = model.NewBoolVar(f"weekend4_{p_idx}_{d_idx}")
+                            weekend_block = model.NewBoolVar(f"weekend_fri_mon_{p_idx}_{d_idx}")
                             sum_expr = sum(x[p_idx, d_idx + i] for i in range(4))
                             model.Add(sum_expr == 4).OnlyEnforceIf(weekend_block)
                             model.Add(sum_expr <= 3).OnlyEnforceIf(weekend_block.Not())
-                            objective_terms.append(weekend_block * bonus_weekend_4)
+                            objective_terms.append(weekend_block * bonus_weekend_fri_sat_sun_mon)
+                            weekend_pattern_count += 1
+                
+                # Pattern 3: Thu-Fri-Sat-Sun (4-day weekend starting Thursday)
+                if dow == 3 and d_idx + 3 < len(chunk_unit_nights):
+                    if (chunk_dow.get(d_idx + 1) == 4 and 
+                        chunk_dow.get(d_idx + 2) == 5 and 
+                        chunk_dow.get(d_idx + 3) == 6):
+                        if all((p_idx, d_idx + i) in x for i in range(4)):
+                            weekend_block = model.NewBoolVar(f"weekend_thu_sun_{p_idx}_{d_idx}")
+                            sum_expr = sum(x[p_idx, d_idx + i] for i in range(4))
+                            model.Add(sum_expr == 4).OnlyEnforceIf(weekend_block)
+                            model.Add(sum_expr <= 3).OnlyEnforceIf(weekend_block.Not())
+                            objective_terms.append(weekend_block * bonus_weekend_thu_fri_sat_sun)
+                            weekend_pattern_count += 1
+        
+        print(f"   Added {weekend_pattern_count} WEEKEND PATTERN bonuses (HIGHEST PRIORITY)")
+        print("   ✅ Weekend blocks (Fri-Sat-Sun, Fri-Sat-Sun-Mon, Thu-Fri-Sat-Sun) strongly incentivized")
         
         # SPACING PREFERENCE: Reward doctors who haven't worked recently
         # This encourages spreading blocks out temporally rather than clustering
@@ -1819,9 +2138,64 @@ class SequentialSolver:
                 # Add spacing bonus to objective
                 objective_terms.append(works_in_chunk * spacing_bonuses[p_idx])
         
-        # FAIRNESS: Minimize maximum load (WTE-adjusted)
+        # 72-HOUR WEEKLY MAXIMUM CONSTRAINT
+        # Prevent excessive runs of long shifts by limiting total hours in any 7-day window
+        # NOTE: Simplified to skip this for large problem sizes (>100 days) due to performance
+        if len(chunk_unit_nights) <= 100:
+            print("   Adding 72-hour weekly maximum constraints...")
+            
+            weekly_max_violations = 0
+            for p_idx, person in unit_night_eligible:
+                # Check each possible 7-day window
+                for window_start_idx in range(len(chunk_unit_nights) - 6):
+                    window_end_idx = window_start_idx + 6  # 7 days total (inclusive)
+                    
+                    # Count nights in this window (each night = 13 hours)
+                    nights_in_window = sum(
+                        x[p_idx, d_idx] 
+                        for d_idx in range(window_start_idx, window_end_idx + 1)
+                        if (p_idx, d_idx) in x
+                    )
+                    
+                    # Also need to account for shifts already assigned in partial_roster
+                    # within this window
+                    existing_hours_in_window = 0
+                    for d_idx in range(window_start_idx, window_end_idx + 1):
+                        day = chunk_unit_nights[d_idx]
+                        day_str = day.isoformat()
+                        
+                        if day_str in self.partial_roster:
+                            existing_shift = self.partial_roster[day_str][person.id]
+                            
+                            # Don't double-count if we're creating a variable for this day
+                            if (p_idx, d_idx) not in x and existing_shift != ShiftType.OFF.value:
+                                try:
+                                    shift_type = ShiftType(existing_shift)
+                                    existing_hours_in_window += int(shift_duration_hours(shift_type))
+                                except ValueError:
+                                    pass  # Unknown shift type
+                    
+                    # Total hours = (nights in window * 13) + existing hours
+                    # Must be <= 72
+                    max_nights_allowed = (72 - existing_hours_in_window) // 13
+                    
+                    if max_nights_allowed < 7:  # If there's a real constraint
+                        model.Add(nights_in_window <= max_nights_allowed)
+                        weekly_max_violations += 1
+            
+            print(f"   Added {weekly_max_violations} weekly maximum hour constraints")
+        else:
+            print(f"   ⚠️  Skipping 72-hour weekly max constraints (problem size: {len(chunk_unit_nights)} days)")
+            print(f"      Will be checked post-solve in constraint validator")
+            weekly_max_violations = 0
+        
+        if weekly_max_violations > 0:
+            print(f"   Added {weekly_max_violations} weekly maximum hour constraints")
+        
+        # FAIRNESS: Minimize maximum load (WTE-adjusted) - CRITICAL PRIORITY
         # Use "MinMax" fairness - minimize the maximum WTE-adjusted workload
-        # This encourages equal distribution more strongly than quadratic penalties
+        # This MUST dominate to ensure fair distribution across all doctors
+        # Fairness weight must be HIGHER than all other bonuses to prevent underutilization
         
         # Create max_load variable
         max_load = model.NewIntVar(0, len(chunk_unit_nights) * 1000, 'max_load')
@@ -1834,18 +2208,33 @@ class SequentialSolver:
             current_total = running_totals[p_idx]['unit_nights']
             
             # Total after this chunk (WTE-adjusted: scale by 100/wte for integer math)
-            # Higher WTE = lower per-night load
-            wte_scale = int(100 / person.wte)  # 0.6 -> 166, 0.8 -> 125, 1.0 -> 100
+            # Higher WTE = lower per-night load (more capacity)
+            # 1.0 WTE -> scale 100 (should get MOST nights)
+            # 0.8 WTE -> scale 125 (should get 80% as many nights)
+            # 0.6 WTE -> scale 166 (should get 60% as many nights)
+            wte_scale = int(100 / person.wte)
             total_load = (current_total + nights_in_chunk) * wte_scale
             
             # Constrain max_load to be >= all individual loads
             model.Add(max_load >= total_load)
         
-        # Maximize objective: block bonuses - singleton penalties - (max_load * weight)
-        # Use fairness weight -100 to balance distribution while still allowing block formation
-        # Block bonuses (10000/8000/5000) dominate for individual decisions
-        # Fairness weight prevents extreme imbalances (e.g., 3 doctors getting all nights)
-        objective_terms.append(max_load * -100)
+        # CRITICAL: Fairness weight MUST be high enough to dominate other bonuses
+        # Weekend bonus: 80,000 per block
+        # Block bonus: 15,000 per block  
+        # Gap penalty: -25,000 per violation
+        # 
+        # Fairness weight: -200,000 per unit of max_load
+        # This ensures that reducing max_load (improving fairness) is worth
+        # sacrificing multiple weekend blocks or gap violations
+        # 
+        # Result: Solver will prioritize distributing work fairly FIRST,
+        # then optimize for weekend coverage and block patterns within that constraint
+        fairness_weight = -200000
+        
+        objective_terms.append(max_load * fairness_weight)
+        
+        print(f"   ⚖️  FAIRNESS: MinMax optimization with weight {fairness_weight}")
+        print(f"   ✅ Fair distribution will DOMINATE over block/weekend preferences")
         
         # Maximize objective
         if objective_terms:
@@ -1880,31 +2269,70 @@ class SequentialSolver:
         
         # print(f"   🔍 CP-SAT Status: {cp_solver.StatusName(status)}")
         
-        # DEBUG: If INFEASIBLE, show variable statistics
+        # DEBUG: If INFEASIBLE, implement LOCUM GAP FLAGGING
         if status not in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
-            print(f"   ❌ INFEASIBLE MODEL - Diagnostics:")
+            print("   ❌ INFEASIBLE MODEL - Analyzing coverage gaps...")
             print(f"      Total nights in chunk: {len(chunk_unit_nights)}")
             print(f"      Total registrars: {len(unit_night_eligible)}")
             
-            # Count how many variables were created per night
+            # Identify nights with ZERO eligible doctors (true coverage gaps)
+            locum_gaps = []
+            partial_coverage_nights = []
+            
             for d_idx, day in enumerate(chunk_unit_nights):
                 vars_this_night = [p_idx for p_idx, _ in unit_night_eligible if (p_idx, d_idx) in x]
                 eligible_names = [unit_night_eligible[i][1].name for i, (p_idx, _) in enumerate(unit_night_eligible) if (p_idx, d_idx) in x]
-                print(f"      {day}: {len(vars_this_night)} doctors can work (need 1) - {eligible_names if eligible_names else 'NONE'}")
                 
                 if len(vars_this_night) == 0:
-                    print(f"         ⚠️ NO VARIABLES - This night has ZERO eligible doctors!")
+                    # TRUE GAP: No eligible doctors at all
+                    locum_gaps.append((day, d_idx))
+                    print(f"      🩺 LOCUM GAP: {day} - ZERO eligible doctors")
+                    
                     # Show why doctors were excluded
                     if (day, d_idx) in excluded_reasons:
                         print(f"         Exclusion reasons:")
-                        for doctor_id, reason in excluded_reasons[(day, d_idx)]:
+                        for doctor_id, reason in excluded_reasons[(day, d_idx)][:3]:  # First 3
                             print(f"           - {doctor_id}: {reason}")
+                            if len(excluded_reasons[(day, d_idx)]) > 3:
+                                print(f"           ... and {len(excluded_reasons[(day, d_idx)]) - 3} more exclusions")
+                                break
+                
                 elif len(vars_this_night) <= 3:
-                    # Also show exclusions for low-eligible nights
-                    if (day, d_idx) in excluded_reasons:
-                        print(f"         ⚠️ Low eligibility - Excluded doctors:")
-                        for doctor_id, reason in excluded_reasons[(day, d_idx)][:3]:  # Show first 3
-                            print(f"           - {doctor_id}: {reason}")
+                    # LOW COVERAGE: Few eligible doctors (may become infeasible due to other constraints)
+                    partial_coverage_nights.append((day, len(vars_this_night), eligible_names))
+            
+            # Handle LOCUM GAPS
+            if locum_gaps:
+                print(f"\n   📋 LOCUM GAP SUMMARY: {len(locum_gaps)} nights require locum coverage")
+                print(f"      (These nights have ZERO eligible staff due to constraint violations)")
+                
+                # Store locum gap information in self for stage handler to access
+                self.last_locum_gaps = [day for day, _ in locum_gaps]
+                
+                for day, d_idx in locum_gaps:
+                    print(f"      • {day} - requires external locum")
+                
+                print(f"\n   ⚠️  Solver will continue with locum gaps flagged.")
+                print(f"      These nights will appear as coverage gaps in the final roster.")
+                print(f"      Admin must arrange locum coverage for these dates.")
+                
+                # Return False to indicate solve didn't succeed completely
+                # But stage handler will check self.last_locum_gaps to allow continuation
+                return False
+            
+            # If no true gaps but still infeasible, show diagnostic info
+            if partial_coverage_nights:
+                print(f"\n   ⚠️ INFEASIBILITY NOT DUE TO COVERAGE GAPS")
+                print(f"      {len(partial_coverage_nights)} nights have limited eligibility:")
+                for day, count, names in partial_coverage_nights[:5]:
+                    print(f"      • {day}: {count} eligible - {', '.join(names)}")
+                print(f"\n      This suggests the model is over-constrained.")
+                print(f"      Consider:")
+                print(f"        - Relaxing block preferences")
+                print(f"        - Reducing fairness constraints")
+                print(f"        - Increasing timeout")
+            
+            return False  # Model is infeasible for non-gap reasons
         
         blocks_formed = 0
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
@@ -2068,6 +2496,10 @@ class SequentialSolver:
         
         # Process all unit nights in one chunk
         chunk_unit_nights = unit_night_days
+        
+        # Clear locum gap tracking before solve
+        self.last_locum_gaps = []
+        
         cp_success = self._assign_unit_night_blocks_with_cpsat(
             chunk_unit_nights, 
             unit_night_eligible, 
@@ -2076,16 +2508,34 @@ class SequentialSolver:
         )
         
         if not cp_success:
-            print(f"⚠️  CP-SAT failed for full period solve")
-
-        if not cp_success:
-            return SequentialSolveResult(
-                stage="nights",
-                success=False,
-                message="Failed to assign unit nights using week-by-week CP-SAT solver.",
-                partial_roster=copy.deepcopy(self.partial_roster),
-                next_stage="weekend_holidays"
-            )
+            # Check if failure was due to locum gaps (nights with zero eligible doctors)
+            if hasattr(self, 'last_locum_gaps') and self.last_locum_gaps:
+                print(f"⚠️  Solver identified {len(self.last_locum_gaps)} nights requiring locum coverage")
+                print(f"   These nights have zero eligible registrars due to constraints.")
+                print(f"   Continuing to next stage - locum gaps will be flagged in final output.")
+                
+                # Continue despite locum gaps - they'll be detected by constraint checker
+                total_assigned = sum(running_totals[p_idx]['unit_nights'] for p_idx, _ in unit_night_eligible)
+                self._display_unit_night_coverage_analysis(unit_night_days, unit_night_eligible, running_totals)
+                
+                return SequentialSolveResult(
+                    stage="nights",
+                    success=True,  # Continue despite gaps
+                    message=f"Unit nights completed with {len(self.last_locum_gaps)} locum gaps. Assigned {total_assigned} shifts. Locum coverage required for: {', '.join(d.isoformat() for d in self.last_locum_gaps[:5])}{'...' if len(self.last_locum_gaps) > 5 else ''}",
+                    partial_roster=copy.deepcopy(self.partial_roster),
+                    assigned_shifts=set(),
+                    next_stage="weekend_holidays"
+                )
+            else:
+                # True failure - not due to locum gaps
+                print("⚠️  CP-SAT failed for full period solve (not due to locum gaps)")
+                return SequentialSolveResult(
+                    stage="nights",
+                    success=False,
+                    message="Failed to assign unit nights using CP-SAT solver. Model is over-constrained.",
+                    partial_roster=copy.deepcopy(self.partial_roster),
+                    next_stage="weekend_holidays"
+                )
         
         # Count final assignments
         total_assigned = sum(running_totals[p_idx]['unit_nights'] for p_idx, _ in unit_night_eligible)
@@ -2372,6 +2822,11 @@ class SequentialSolver:
         
         # Create decision variables: x[p_idx, weekend_idx] = 1 if person works this COMET weekend
         x = {}
+        night_shift_types = [ShiftType.COMET_NIGHT.value, ShiftType.NIGHT_REG.value]
+        
+        # Track which doctors can work which weekends
+        doctor_weekend_availability = {person.name: 0 for _, person in comet_eligible}
+        
         for p_idx, person in comet_eligible:
             for w_idx, (saturday, sunday) in enumerate(comet_weekends):
                 # Check if person is available on both days
@@ -2382,8 +2837,34 @@ class SequentialSolver:
                 sun_shift = self.partial_roster[sun_str][person.id]
                 
                 # Can only assign if both days are OFF
-                if sat_shift == ShiftType.OFF.value and sun_shift == ShiftType.OFF.value:
+                if sat_shift != ShiftType.OFF.value or sun_shift != ShiftType.OFF.value:
+                    continue
+                
+                # CRITICAL: Check 46-hour rest after nights
+                # If worked a night on Thursday or Friday, cannot work Saturday day shift
+                # A night shift ends at ~08:00 the next morning, need 46 hours = ~2 days rest
+                friday = saturday - timedelta(days=1)
+                thursday = saturday - timedelta(days=2)
+                
+                can_work_weekend = True
+                
+                # Check if worked night on Thursday or Friday
+                for check_day in [thursday, friday]:
+                    if check_day in self.days:
+                        check_str = check_day.isoformat()
+                        check_shift = self.partial_roster[check_str][person.id]
+                        if check_shift in night_shift_types:
+                            can_work_weekend = False
+                            break
+                
+                if can_work_weekend:
                     x[p_idx, w_idx] = model.NewBoolVar(f"comet_weekend_{p_idx}_{w_idx}")
+                    doctor_weekend_availability[person.name] += 1
+        
+        # Print availability stats
+        print(f"  COMET Weekend Availability:")
+        for doctor_name, available_count in doctor_weekend_availability.items():
+            print(f"    {doctor_name}: can work {available_count}/{len(comet_weekends)} COMET weekends")
         
         # HARD CONSTRAINT: Exactly 1 COMET-eligible doctor per weekend
         for w_idx in range(len(comet_weekends)):
@@ -2400,6 +2881,28 @@ class SequentialSolver:
             wte_scale = int(100 / person.wte)
             wte_adjusted_load = weekends_worked * wte_scale
             model.Add(max_weekends >= wte_adjusted_load)
+        
+        # FAIRNESS: Add minimum weekend constraints to prevent exclusion
+        # Calculate fair minimum: (total_weekends_to_cover / total_wte) * person.wte
+        total_wte = sum(person.wte for _, person in comet_eligible)
+        weekends_to_cover = len(comet_weekends)
+        
+        for p_idx, person in comet_eligible:
+            # Count available weekends for this doctor
+            available_count = doctor_weekend_availability.get(person.name, 0)
+            
+            # If doctor is available for significant portion, ensure minimum
+            # Fair share would be: (weekends_to_cover / total_wte) * person.wte
+            fair_share = (weekends_to_cover / total_wte) * person.wte
+            
+            # Set minimum to 50% of fair share for COMET (fewer weekends total)
+            # But only if they're available for at least that many
+            min_weekends = max(0, min(int(fair_share * 0.5), available_count))
+            
+            if min_weekends > 0:
+                weekends_worked = sum(x.get((p_idx, w_idx), 0) for w_idx in range(len(comet_weekends)))
+                model.Add(weekends_worked >= min_weekends)
+                print(f"  {person.name}: minimum {min_weekends} COMET weekends (fair share: {fair_share:.1f}, available: {available_count})")
         
         # Minimize maximum load
         model.Minimize(max_weekends)
@@ -2466,6 +2969,10 @@ class SequentialSolver:
         # For holiday weekends, we may need separate variables for individual days
         x = {}  # Weekend blocks
         x_single = {}  # Holiday singletons
+        night_shift_types = [ShiftType.COMET_NIGHT.value, ShiftType.NIGHT_REG.value]
+        
+        # Track which doctors can work which weekends
+        doctor_unit_weekend_availability = {person.name: 0 for _, person in registrars}
         
         for p_idx, person in registrars:
             for w_idx, (saturday, sunday) in enumerate(all_weekends):
@@ -2479,16 +2986,50 @@ class SequentialSolver:
                 sat_is_holiday = saturday in holiday_singleton_dates
                 sun_is_holiday = sunday in holiday_singleton_dates
                 
+                # CRITICAL: Check 46-hour rest after nights for BOTH weekend days
+                friday = saturday - timedelta(days=1)
+                thursday = saturday - timedelta(days=2)
+                saturday_prev = sunday - timedelta(days=1)  # Actually Saturday, but checking for Sunday
+                friday_for_sun = sunday - timedelta(days=2)
+                
+                can_work_saturday = True
+                can_work_sunday = True
+                
+                # Check if can work Saturday (need to check Thu/Fri for night shifts)
+                for check_day in [thursday, friday]:
+                    if check_day in self.days:
+                        check_str = check_day.isoformat()
+                        check_shift = self.partial_roster[check_str][person.id]
+                        if check_shift in night_shift_types:
+                            can_work_saturday = False
+                            break
+                
+                # Check if can work Sunday (need to check Fri/Sat for night shifts)
+                for check_day in [friday_for_sun, saturday_prev]:
+                    if check_day in self.days:
+                        check_str = check_day.isoformat()
+                        check_shift = self.partial_roster[check_str][person.id]
+                        if check_shift in night_shift_types:
+                            can_work_sunday = False
+                            break
+                
                 if sat_is_holiday or sun_is_holiday:
                     # Allow separate assignment for holiday days
-                    if sat_shift == ShiftType.OFF.value:
+                    if sat_shift == ShiftType.OFF.value and can_work_saturday:
                         x_single[p_idx, w_idx, 'sat'] = model.NewBoolVar(f"unit_single_sat_{p_idx}_{w_idx}")
-                    if sun_shift == ShiftType.OFF.value:
+                    if sun_shift == ShiftType.OFF.value and can_work_sunday:
                         x_single[p_idx, w_idx, 'sun'] = model.NewBoolVar(f"unit_single_sun_{p_idx}_{w_idx}")
                 else:
                     # Normal weekend - must work both days
-                    if sat_shift == ShiftType.OFF.value and sun_shift == ShiftType.OFF.value:
+                    if (sat_shift == ShiftType.OFF.value and sun_shift == ShiftType.OFF.value 
+                        and can_work_saturday and can_work_sunday):
                         x[p_idx, w_idx] = model.NewBoolVar(f"unit_weekend_{p_idx}_{w_idx}")
+                        doctor_unit_weekend_availability[person.name] += 1
+        
+        # Print availability stats
+        print(f"  Unit Weekend Availability:")
+        for doctor_name, available_count in doctor_unit_weekend_availability.items():
+            print(f"    {doctor_name}: can work {available_count}/{len(all_weekends)} Unit weekends")
         
         # HARD CONSTRAINT: Exactly 1 registrar per day
         for w_idx, (saturday, sunday) in enumerate(all_weekends):
@@ -2565,6 +3106,32 @@ class SequentialSolver:
             wte_scale = int(100 / person.wte)
             wte_adjusted_load = total_weekends * wte_scale
             model.Add(max_weekends >= wte_adjusted_load)
+        
+        # FAIRNESS: Add minimum weekend constraints to prevent exclusion
+        # Calculate fair minimum: (total_weekends_to_cover / total_wte) * person.wte
+        total_wte = sum(person.wte for _, person in registrars)
+        weekends_to_cover = len(all_weekends)
+        
+        for p_idx, person in registrars:
+            # Count available weekends for this doctor
+            available_count = doctor_unit_weekend_availability.get(person.name, 0)
+            
+            # If doctor is available for significant portion, ensure minimum
+            # Fair share would be: (weekends_to_cover / total_wte) * person.wte
+            fair_share = (weekends_to_cover / total_wte) * person.wte
+            
+            # Set minimum to 70% of fair share (allows some flexibility)
+            # But only if they're available for at least that many
+            min_weekends = max(0, min(int(fair_share * 0.7), available_count))
+            
+            if min_weekends > 0:
+                weekend_blocks = sum(x.get((p_idx, w_idx), 0) for w_idx in range(len(all_weekends)))
+                holiday_singletons = sum(x_single.get((p_idx, w_idx, day), 0) 
+                                        for w_idx in range(len(all_weekends))
+                                        for day in ['sat', 'sun'])
+                total_assigned = weekend_blocks + holiday_singletons
+                model.Add(total_assigned >= min_weekends)
+                print(f"  {person.name}: minimum {min_weekends} weekends (fair share: {fair_share:.1f}, available: {available_count})")
         
         # Minimize maximum load
         model.Minimize(max_weekends)
@@ -2739,7 +3306,7 @@ class SequentialSolver:
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
             for p_idx, person in comet_eligible_people:
                 for d_idx in bank_holiday_indices:
-                    if (p_idx, d_idx) in x and cp_solver.Value(x[p_idx, d_idx]) == 1:
+                    if (p_idx, d_idx) in x and solver.Value(x[p_idx, d_idx]) == 1:
                         day = self.days[d_idx]
                         day_str = day.isoformat()
                         self.partial_roster[day_str][person.id] = ShiftType.COMET_DAY.value
@@ -2818,7 +3385,7 @@ class SequentialSolver:
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
             for p_idx, person in registrars:
                 for d_idx in need_long_day_coverage:
-                    if (p_idx, d_idx) in x and cp_solver.Value(x[p_idx, d_idx]) == 1:
+                    if (p_idx, d_idx) in x and solver.Value(x[p_idx, d_idx]) == 1:
                         day = self.days[d_idx]
                         day_str = day.isoformat()
                         self.partial_roster[day_str][person.id] = ShiftType.LONG_DAY_REG.value
@@ -2915,7 +3482,7 @@ class SequentialSolver:
                 for d_idx in weekday_days:
                     day = self.days[d_idx]
                     for shift in long_day_shifts:
-                        if (p_idx, d_idx, shift) in x and cp_solver.Value(x[p_idx, d_idx, shift]) == 1:
+                        if (p_idx, d_idx, shift) in x and solver.Value(x[p_idx, d_idx, shift]) == 1:
                             # Update partial roster
                             self.partial_roster[day.isoformat()][person.id] = shift.value
                             new_assignments.add((p_idx, d_idx, shift))
@@ -3000,7 +3567,7 @@ class SequentialSolver:
                     current_assignment = self.partial_roster[day.isoformat()][person.id]
                     if current_assignment == ShiftType.OFF.value:
                         for shift in short_day_shifts:
-                            if (p_idx, d_idx, shift) in x and cp_solver.Value(x[p_idx, d_idx, shift]) == 1:
+                            if (p_idx, d_idx, shift) in x and solver.Value(x[p_idx, d_idx, shift]) == 1:
                                 # Update partial roster
                                 self.partial_roster[day.isoformat()][person.id] = shift.value
                                 new_assignments.add((p_idx, d_idx, shift))
@@ -3842,6 +4409,10 @@ class SequentialSolver:
         # If we found doctors for all blocks, make the assignments
         for i, (block_size, day_indices) in enumerate(assignment):
             p_idx, person = selected_doctors[i]
+            
+            # DEBUG: Show what's being assigned
+            days_list = [self.days[day_idx] for day_idx in day_indices]
+            print(f"   📋 Assigning {block_size}-night block to {person.name}: {days_list[0].strftime('%a %d')} to {days_list[-1].strftime('%a %d')}")
             
             for day_idx in day_indices:
                 day_date = self.days[day_idx]

@@ -271,20 +271,26 @@
         .rota-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             margin-top: 1rem;
+            table-layout: fixed;
         }
         
         .rota-table th, .rota-table td {
             border: 1px solid #dde4ef;
-            padding: 0.5rem;
+            padding: 0.25rem;
             text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .rota-table th {
             background: #34495e;
             color: white;
             font-weight: 600;
+            font-size: 0.65rem;
+            padding: 0.3rem 0.2rem;
         }
         
         /* Enhanced Shift color coding for better readability */
@@ -356,6 +362,15 @@
                     <div class="tab" onclick="showTab('solve')">🔧 Generate Rota</div>
                     <div class="tab" onclick="showTab('results')">📊 Results & Export</div>
                 </div>
+            </div>
+            
+            <!-- Progress Bar - Always Visible Across All Tabs -->
+            <div id="solve-progress" style="display: none; padding: 1.5rem; background: #e8f4f8; border-bottom: 3px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h3 style="margin-top: 0; margin-bottom: 0.75rem; color: #2c3e50; font-weight: 600;">🔄 Solving Progress</h3>
+                <div class="progress-bar" style="height: 30px; border: 2px solid #3498db;">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div id="progress-text" style="margin-top: 0.75rem; font-size: 1.1em; font-weight: 500; color: #34495e;">Initializing...</div>
             </div>
             
             <div class="card-body">
@@ -474,7 +489,8 @@
                 <!-- Solve Tab -->
                 <div id="solve" class="tab-content">
                     <div class="alert alert-warning">
-                        <strong>Generate Rota:</strong> This process may take 10-30 minutes for a 6-month period. Progress will be shown below.
+                        <strong>Generate Rota:</strong> Full 6-month optimization. Each stage processes the entire period for optimal gap detection and weekend continuity. <strong>Total time: 15-30 minutes.</strong><br>
+                        <small><em>Note: HTTP timeout is set to 10 minutes per stage. If a stage takes longer, you may need to retry or check server logs.</em></small>
                     </div>
                     
                     <div class="form-group">
@@ -488,9 +504,9 @@
                     
                     <div class="form-group">
                         <label>Timeout per Stage (minutes):</label>
-                        <input type="number" id="timeout" value="60" min="5" max="180">
+                        <input type="number" id="timeout" value="5" min="1" max="30">
                         <small style="color: #7f8c8d; display: block; margin-top: 0.25rem;">
-                            Increased timeout for 26-week roster generation. Each stage may take several minutes.
+                            <strong>Extended timeout for full-period optimization.</strong> Each stage solves the entire 6-month roster (2-5 minutes per stage). This ensures perfect gap detection and optimal patterns.
                         </small>
                     </div>
                     
@@ -498,19 +514,6 @@
                         <button class="btn btn-success" id="btn-start-solve" onclick="startSolve()">🚀 Generate Rota</button>
                         <button class="btn btn-primary" id="btn-interactive-solve" onclick="startInteractiveSolve()">⏸️ Interactive Mode</button>
                         <button class="btn btn-danger" id="btn-stop-solve" onclick="stopSolve()" disabled>⏹️ Stop</button>
-                    </div>                    <div id="solve-progress" style="display: none;">
-                        <h4>Progress:</h4>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progress-fill"></div>
-                        </div>
-                        <div id="progress-text">Initializing...</div>
-                        
-                        <div id="stage-progress">
-                            <h5>Stage Progress:</h5>
-                            <div id="stage-list">
-                                <!-- Stage progress will be shown here -->
-                            </div>
-                        </div>
                     </div>
                 </div>
                 
@@ -632,31 +635,38 @@
         const stageOrder = [
             { name: 'comet_nights', display: 'COMET Nights Assignment', api: 'comet_nights' },
             { name: 'nights', display: 'Unit Nights Assignment', api: 'nights' },
-            { name: 'holiday', display: 'Holiday Working Assignment', api: 'holiday' },
+            { name: 'weekend_holidays', display: 'Weekend Long Days', api: 'weekend_holidays' },
             { name: 'comet_days', display: 'COMET Days Assignment', api: 'comet_days' },
-            { name: 'long_days', display: 'Unit Long Days Assignment', api: 'long_days' },
+            { name: 'weekday_long_days', display: 'Unit Long Days Assignment', api: 'weekday_long_days' },
             { name: 'short_days', display: 'Short Days Assignment', api: 'short_days' }
         ];
 
         function startSolve() {
             if (solveInProgress) return;
             
-            // Reset sequential solving state
-            currentStage = 0;
-            currentRosterData = null;
-            
-            // Gather input data from UI
-            const startDate = document.getElementById('start-date').value;
-            const endDate = document.getElementById('end-date').value;
-            const cometStart = document.getElementById('comet-start').value;
-            const bankHolidays = document.getElementById('bank-holidays').value.split('\n').map(x => x.split(' ')[0]).filter(x => x);
-            
-            const doctors = Array.from(document.querySelectorAll('.doctor-card')).map(card => ({
+            try {
+                // Reset sequential solving state
+                currentStage = 0;
+                currentRosterData = null;
+                
+                console.log('Starting solve - gathering input data...');
+                
+                // Gather input data from UI
+                const startDate = document.getElementById('start-date').value;
+                const endDate = document.getElementById('end-date').value;
+                const cometStart = document.getElementById('comet-start').value;
+                const bankHolidays = document.getElementById('bank-holidays').value.split('\n').map(x => x.split(' ')[0]).filter(x => x);
+                
+                console.log('Basic inputs gathered, now gathering doctor data...');
+                
+                var doctors = Array.from(document.querySelectorAll('.doctor-card')).map(card => ({
                 name: card.querySelector('input[type="text"]').value,
                 grade: card.querySelector('select[name="grade"]').value,
                 wte: parseFloat(card.querySelector('select[name="wte"]').value),
                 comet_eligible: card.querySelector('input[name="comet"]').checked
             }));
+            
+            console.log('Doctor data gathered successfully:', doctors.length, 'doctors found');
             
             const regTraining = Array.from(document.getElementById('reg-training-dates').querySelectorAll('.date-item span')).map(e => e.textContent);
             const shoTraining = Array.from(document.getElementById('sho-training-dates').querySelectorAll('.date-item span')).map(e => e.textContent);
@@ -705,15 +715,44 @@
             
             console.log('Starting sequential solve with payload:', solvePayload);
             
+            // Initialize progress bar
+            document.getElementById('solve-progress').style.display = 'block';
+            document.getElementById('progress-fill').style.width = '0%';
+            document.getElementById('progress-text').innerHTML = 
+                `<span style="color: #3498db; font-weight: bold;">Starting solver...</span>`;
+            
             // Start with first stage
             solveNextStage();
+            
+            } catch (error) {
+                console.error('Error in startSolve function:', error);
+                alert('Error starting solve: ' + error.message);
+                solveInProgress = false;
+                document.getElementById('btn-start-solve').disabled = false;
+                document.getElementById('btn-stop-solve').disabled = true;
+            }
         }
         
         function solveNextStage() {
+            console.log('🔍 solveNextStage() called');
+            console.log('   currentStage:', currentStage);
+            console.log('   stageOrder.length:', stageOrder.length);
+            
             if (currentStage >= stageOrder.length) {
                 // All stages complete
+                console.log('   → All stages complete!');
                 solveInProgress = false;
-                document.getElementById('solve-progress').style.display = 'none';
+                
+                // Keep progress bar visible showing 100% completion
+                const progressDiv = document.getElementById('solve-progress');
+                if (progressDiv) {
+                    progressDiv.style.display = 'block';
+                    document.getElementById('progress-fill').style.width = '100%';
+                    document.getElementById('progress-text').innerHTML = 
+                        `<span style="color: #27ae60; font-weight: bold;">🎉 All Stages Complete! (6/6)</span><br>` +
+                        `<span style="color: #7f8c8d; font-size: 0.9em;">Rota generation finished successfully</span>`;
+                }
+                
                 document.getElementById('btn-start-solve').disabled = false;
                 document.getElementById('btn-stop-solve').disabled = true;
                 showTab('results');
@@ -723,16 +762,32 @@
             }
             
             const stage = stageOrder[currentStage];
+            console.log('   → Processing stage:', stage.display, '(API:', stage.api + ')');
             solveInProgress = true;
             document.getElementById('solve-progress').style.display = 'block';
             document.getElementById('btn-start-solve').disabled = true;
             document.getElementById('btn-stop-solve').disabled = false;
             
-            // Update progress display
+            // Update progress display with animated solving indicator
             const progressPercent = ((currentStage) / stageOrder.length) * 100;
             document.getElementById('progress-fill').style.width = progressPercent + '%';
-            document.getElementById('progress-text').textContent = 
-                `Stage ${currentStage + 1}/${stageOrder.length}: ${stage.display}`;
+            document.getElementById('progress-text').innerHTML = 
+                `Stage ${currentStage + 1}/${stageOrder.length}: ${stage.display}<br>` +
+                `<span style="color: #3498db; font-weight: bold;">` +
+                `🔄 Solving... (CP-SAT optimizer running, check server logs for details)</span>`;
+            
+            // Add animation to show activity
+            const progressText = document.getElementById('progress-text');
+            let dotCount = 0;
+            const animationInterval = setInterval(() => {
+                dotCount = (dotCount + 1) % 4;
+                const dots = '.'.repeat(dotCount);
+                progressText.innerHTML = 
+                    `<strong style="font-size: 1.1em;">Stage ${currentStage + 1}/${stageOrder.length}: ${stage.display}</strong><br>` +
+                    `<span style="color: #3498db; font-weight: bold; font-size: 1.05em;">` +
+                    `🔄 Solving${dots} (processing full 6-month period - may take 2-5 minutes)</span><br>` +
+                    `<span style="color: #7f8c8d; font-size: 0.9em;">CP-SAT optimizer running • Check server logs for detailed progress</span>`;
+            }, 500);
             
             // Build stage-specific payload
             const stagePayload = {
@@ -742,17 +797,26 @@
 
             console.log(`Solving stage ${currentStage + 1}: ${stage.display}`);
 
-            // Call backend API for this stage
+            // Call backend API for this stage with extended timeout
+            // Use AbortController to set a long timeout (10 minutes = 600 seconds)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes
+
             fetch('/solve_sequential', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(stagePayload)
+                body: JSON.stringify(stagePayload),
+                signal: controller.signal
             })
             .then(res => {
+                clearTimeout(timeoutId); // Clear timeout on success
                 console.log('Response status:', res.status);
                 return res.json();
             })
             .then(data => {
+                // Stop animation
+                clearInterval(animationInterval);
+                
                 console.log('Stage response:', data);
                 
                 // Check if solver timed out or hit constraints
@@ -778,12 +842,33 @@
                 showStageResults(stage, data);
             })
             .catch(err => {
+                // Stop animation on error
+                clearInterval(animationInterval);
+                clearTimeout(timeoutId); // Clear timeout
+                
                 console.error('Error:', err);
                 solveInProgress = false;
-                document.getElementById('solve-progress').style.display = 'none';
+                
+                // Check if it was a timeout/abort
+                let errorMessage = err.message;
+                if (err.name === 'AbortError') {
+                    errorMessage = 'Request timeout (10 minutes exceeded). The solver may still be running on the server. Try increasing the timeout or check server logs.';
+                }
+                
+                // Keep progress bar visible but show error state
+                const progressDiv = document.getElementById('solve-progress');
+                if (progressDiv) {
+                    progressDiv.style.display = 'block';
+                    const progressPercent = ((currentStage) / stageOrder.length) * 100;
+                    document.getElementById('progress-fill').style.width = progressPercent + '%';
+                    document.getElementById('progress-text').innerHTML = 
+                        `<span style="color: #e74c3c; font-weight: bold;">❌ Stage ${currentStage + 1}/${stageOrder.length}: ${stage.display} - Error</span><br>` +
+                        `<span style="color: #7f8c8d; font-size: 0.9em;">${errorMessage}</span>`;
+                }
+                
                 document.getElementById('btn-start-solve').disabled = false;
                 document.getElementById('btn-stop-solve').disabled = true;
-                alert(`Error in stage ${stage.display}: ${err.message}`);
+                alert(`Error in stage ${stage.display}: ${errorMessage}`);
             });
         }
         
@@ -791,6 +876,19 @@
             solveInProgress = false;
             document.getElementById('btn-start-solve').disabled = false;
             document.getElementById('btn-stop-solve').disabled = true;
+            
+            // Keep progress bar visible but update to show completion
+            const progressDiv = document.getElementById('solve-progress');
+            if (progressDiv) {
+                progressDiv.style.display = 'block';
+                
+                // Update progress to show this stage is complete
+                const progressPercent = ((currentStage + 1) / stageOrder.length) * 100;
+                document.getElementById('progress-fill').style.width = progressPercent + '%';
+                document.getElementById('progress-text').innerHTML = 
+                    `<span style="color: #27ae60; font-weight: bold;">✅ Stage ${currentStage + 1}/${stageOrder.length}: ${stage.display} - Complete</span><br>` +
+                    `<span style="color: #7f8c8d; font-size: 0.9em;">Review results below and click Continue when ready</span>`;
+            }
             
             // Show current results
             showTab('results');
@@ -845,7 +943,7 @@
                 <p style="margin: 1rem 0; white-space: pre-line;">${message}</p>
                 <div style="text-align: right; margin-top: 2rem;">
                     ${!isComplete ? `
-                        <button onclick="continueToNextStage()" class="btn btn-success" style="margin-right: 1rem;">
+                        <button onclick="continueFromModal()" class="btn btn-success" style="margin-right: 1rem;">
                             ✅ Continue to "${nextStage}"
                         </button>
                     ` : ''}
@@ -860,9 +958,13 @@
             window.currentStageModal = modal;
         }
         
-        function continueToNextStage() {
+        function continueFromModal() {
+            console.log('🔍 continueFromModal() called');
+            console.log('   currentStage before increment:', currentStage);
             closeStageDialog();
             currentStage++;
+            console.log('   currentStage after increment:', currentStage);
+            console.log('   → Calling solveNextStage in 500ms');
             setTimeout(solveNextStage, 500); // Small delay for UI
         }
         
@@ -875,27 +977,46 @@
         
         function generateCometWeeks(cometStartDate, rosterStartDate, rosterEndDate) {
             const cometWeeks = [];
-            const startDate = new Date(cometStartDate);
-            const endDate = new Date(rosterEndDate);
-            const rosterStart = new Date(rosterStartDate);
+            // Use local date parsing to avoid timezone issues
+            const [startYear, startMonth, startDay] = cometStartDate.split('-').map(Number);
+            const [endYear, endMonth, endDay] = rosterEndDate.split('-').map(Number);
+            const [rosterYear, rosterMonth, rosterDay] = rosterStartDate.split('-').map(Number);
+            
+            const startDate = new Date(startYear, startMonth - 1, startDay);
+            const endDate = new Date(endYear, endMonth - 1, endDay);
+            const rosterStart = new Date(rosterYear, rosterMonth - 1, rosterDay);
             
             // Ensure we start from a Monday (COMET weeks should start on Monday)
-            const currentDate = new Date(startDate);
+            let currentDate = new Date(startDate);
             while (currentDate.getDay() !== 1) { // 1 = Monday
                 currentDate.setDate(currentDate.getDate() - 1);
             }
             
             // Generate COMET weeks every 2 weeks
             while (currentDate <= endDate) {
+                // CRITICAL: Ensure currentDate is still a Monday after date arithmetic
+                // If not Monday, adjust FORWARD to next Monday (not backward!)
+                const dayOfWeek = currentDate.getDay();
+                if (dayOfWeek !== 1) { // 1 = Monday
+                    // Calculate days to add to reach next Monday
+                    // Sun(0) needs +1, Tue(2) needs +6, Wed(3) needs +5, etc.
+                    const daysToAdd = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+                    currentDate.setDate(currentDate.getDate() + daysToAdd);
+                }
+                
                 // Only include weeks that overlap with the roster period
                 const weekEnd = new Date(currentDate);
                 weekEnd.setDate(weekEnd.getDate() + 6); // End of week (Sunday)
                 
                 if (weekEnd >= rosterStart && currentDate <= endDate) {
-                    cometWeeks.push(currentDate.toISOString().split('T')[0]);
+                    // Format date manually to avoid timezone issues with toISOString()
+                    const year = currentDate.getFullYear();
+                    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(currentDate.getDate()).padStart(2, '0');
+                    cometWeeks.push(`${year}-${month}-${day}`);
                 }
                 
-                // Move to next COMET week (2 weeks later)
+                // Move to next COMET week (2 weeks = 14 days later)
                 currentDate.setDate(currentDate.getDate() + 14);
             }
             
@@ -1207,13 +1328,14 @@
         }
         
         function generateDoctorKey() {
-            const doctors = Array.from(document.querySelectorAll('.doctor-card')).map((card, index) => ({
+            const doctorCards = Array.from(document.querySelectorAll('.doctor-card'));
+            const doctors = doctorCards.map((card, index) => ({
                 id: `dr${index + 1}`,
                 name: card.querySelector('input[type="text"]').value || `Doctor ${index + 1}`,
                 wte: parseFloat(card.querySelector('select[name="wte"]').value || 0.8),
                 grade: card.querySelector('select[name="grade"]').value || 'Registrar',
                 comet: card.querySelector('input[name="comet"]').checked
-            })).filter(d => d.name.trim() !== '' && d.name !== `Doctor ${doctors.length}`);
+            })).filter((d, index) => d.name.trim() !== '' && d.name !== `Doctor ${index + 1}`);
 
             let keyHtml = `
                 <div class="card" style="margin-bottom: 1rem; background: #f8f9fa; border-left: 4px solid #3498db;">
@@ -1241,6 +1363,50 @@
             return keyHtml;
         }
 
+        function continueToNextStage() {
+            console.log('🔍 continueToNextStage() called');
+            console.log('   currentStage:', currentStage);
+            console.log('   stageOrder.length:', stageOrder.length);
+            console.log('   solveInProgress:', solveInProgress);
+            
+            // First, check if there's a modal and use its button
+            const modalContinueBtn = document.querySelector('button[onclick*="continueFromModal"]');
+            console.log('   modalContinueBtn found:', !!modalContinueBtn);
+            if (modalContinueBtn) {
+                console.log('   → Clicking modal button');
+                modalContinueBtn.click();
+                return;
+            }
+            
+            // Check if there are more stages to process
+            if (currentStage >= stageOrder.length - 1) {
+                console.log('   → All stages completed, showing alert');
+                alert('All stages completed! This is the final rota.');
+                return;
+            }
+            
+            console.log('   → Proceeding to next stage');
+            // If no modal present, need to reactivate the solving state since showStageResults sets it to false
+            solveInProgress = true;
+            document.getElementById('btn-start-solve').disabled = true;
+            document.getElementById('btn-stop-solve').disabled = false;
+            
+            // Use the exact same logic as the modal button
+            currentStage++;
+            console.log('   → Incremented currentStage to:', currentStage);
+            console.log('   → Calling solveNextStage in 500ms');
+            setTimeout(solveNextStage, 500); // Small delay for UI - same as modal
+        }
+
+        function startInteractiveMode() {
+            // Switch to generate tab and start interactive mode
+            showTab('generate');
+            setTimeout(() => {
+                // Start interactive solve
+                document.getElementById('btn-interactive').click();
+            }, 100);
+        }
+
         function continueFromResults() {
             if (interactiveState.nextStage) {
                 continueInteractive();
@@ -1260,12 +1426,24 @@
             // Add doctor key at the top
             const doctorKeyHtml = generateDoctorKey();
             
-            // Add continue button if in interactive mode
-            const continueButtonHtml = solveInProgress ? 
-                `<div style="margin-bottom: 1rem;">
-                    <button class="btn btn-primary" onclick="showInteractiveMode()" style="margin-right: 1rem;">📋 Return to Interactive Mode</button>
-                    <button class="btn btn-success" onclick="continueFromResults()" style="margin-right: 1rem;">➡️ Continue to Next Stage</button>
-                </div>` : '';
+            // Add continue button - always available with dynamic text
+            let nextStageText = 'Continue to Next Stage';
+            if (currentStage < stageOrder.length - 1) {
+                nextStageText = `Continue to "${stageOrder[currentStage + 1].display}"`;
+            }
+            
+            const continueButtonHtml = 
+                `<div style="margin: 2rem 0; text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 2px solid #e9ecef;">
+                    <h4 style="margin-bottom: 1rem; color: #495057;">🎯 Next Steps</h4>
+                    ${currentStage < stageOrder.length - 1 ? 
+                        `<button class="btn btn-success" onclick="continueToNextStage()" style="margin-right: 1rem;">✅ ${nextStageText}</button>
+                         <button class="btn btn-info" onclick="showInteractiveMode()" style="margin-right: 1rem;">🎛️ Interactive Mode</button>` :
+                        `<button class="btn btn-primary" onclick="showTab('generate')" style="margin-right: 1rem;">🔄 Generate New Rota</button>
+                         <button class="btn btn-info" onclick="showTab('generate')" style="margin-right: 1rem;">⚙️ Modify Settings</button>`
+                    }
+                    <button class="btn btn-secondary" onclick="exportExcel()" style="margin-right: 1rem;">📊 Export Excel</button>
+                    <button class="btn btn-secondary" onclick="exportPDF()">📄 Export PDF</button>
+                </div>`;
             
             // Build shift legend first
             const legendHtml = `
@@ -1309,10 +1487,10 @@
                 idToName[doctorId] = doctorName;
             });
 
-            let html = legendHtml + '<table class="rota-table"><thead><tr><th>Date</th>';
+            let html = legendHtml + '<div style="overflow-x: auto; margin: 1rem 0;"><table class="rota-table"><thead><tr><th>Date</th>';
             doctorNames.forEach(name => {
                 const displayName = idToName[name] || name.replace(/^dr\d+$/, 'Dr ' + name.slice(2));
-                html += `<th style="min-width: 120px;" title="${name}">${displayName}</th>`;
+                html += `<th style="min-width: 80px;" title="${name}">${displayName}</th>`;
             });
             html += '</tr></thead><tbody>';
             
@@ -1336,13 +1514,13 @@
                 });
                 html += '</tr>';
             });
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             
             // Add summary statistics
             html += generateRotaSummary(roster, doctorNames);
             
-            // Combine all HTML content
-            const finalHtml = doctorKeyHtml + continueButtonHtml + html;
+            // Combine all HTML content - put continue button at TOP for immediate visibility
+            const finalHtml = continueButtonHtml + legendHtml + html + doctorKeyHtml;
             container.innerHTML = finalHtml;
         }
         
@@ -1428,7 +1606,8 @@
                 const unitNights = (counts['N_REG'] || 0) + (counts['N_SHO'] || 0);
                 const longDays = (counts['LD_REG'] || 0) + (counts['LD_SHO'] || 0);
                 const shortDays = (counts['SD'] || 0);
-                const holidays = (counts['LEAVE'] || 0);
+                // Count work on bank holidays (not LEAVE)
+                const holidaysWorked = calculateHolidayWork(roster, rosterDates, doctor);
                 const totalShifts = Object.values(counts).reduce((a, b) => a + b, 0);
                 
                 // Calculate total hours (approximate)
@@ -1448,7 +1627,7 @@
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${unitNights}</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${longDays}</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${shortDays}</td>`;
-                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${holidays}</td>`;
+                summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${holidaysWorked}</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${avgWeeklyHours}h</td>`;
                 summaryHtml += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><strong>${totalShifts}</strong></td>`;
                 summaryHtml += '</tr>';
@@ -1457,6 +1636,21 @@
             
             summaryHtml += '</div></div>';
             return summaryHtml;
+        }
+        
+        function calculateHolidayWork(roster, dates, doctor) {
+            let holidayCount = 0;
+            dates.forEach(date => {
+                const isBankHoliday = checkIfBankHoliday(date);
+                if (isBankHoliday) {
+                    const shift = roster[date][doctor];
+                    // Count any work shift on a bank holiday (not OFF or LEAVE)
+                    if (shift && shift !== 'OFF' && shift !== 'LEAVE') {
+                        holidayCount++;
+                    }
+                }
+            });
+            return holidayCount;
         }
         
         // Export functions

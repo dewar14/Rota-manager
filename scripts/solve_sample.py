@@ -66,5 +66,17 @@ if result.success:
     for name, counts in comet_assignments.items():
         total = counts["cmd"] + counts["cmn"]
         print(f"  {name}: {counts['cmd']} CMD + {counts['cmn']} CMN = {total} total")
+    
+    # Continue to Unit Nights stage
+    print("\n==================================================")
+    print("STEP 2: UNIT NIGHT ASSIGNMENTS")
+    print("==================================================\n")
+    unit_result = solver.solve_stage("nights", timeout_seconds=180)
+    
+    if unit_result.success:
+        print(f"\nUnit Nights stage: {unit_result.message}")
+    else:
+        print(f"\nUnit Nights stage failed: {unit_result.message}")
 else:
     print(f"COMET stage failed: {result.message}")
+

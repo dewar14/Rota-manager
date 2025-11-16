@@ -1,0 +1,1019 @@
+INFO:     Will watch for changes in these directories: ['/workspaces/Rota-manager']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [279] using StatReload
+INFO:     Started server process [297]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:41474 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41480 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54666 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54682 - "GET / HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:54682 - "GET /static/medical_rota_ui.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54682 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [297]
+INFO:     Started server process [4536]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [4536]
+INFO:     Started server process [4627]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [4627]
+INFO:     Started server process [4717]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [4717]
+INFO:     Started server process [4816]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [4816]
+INFO:     Started server process [4948]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [4948]
+INFO:     Started server process [5133]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5133]
+INFO:     Started server process [5421]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5421]
+INFO:     Started server process [5538]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5538]
+INFO:     Started server process [5628]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5628]
+INFO:     Started server process [5836]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5836]
+INFO:     Started server process [5933]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'scripts/solve_sample.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5933]
+INFO:     Started server process [8272]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'scripts/solve_sample.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [8272]
+INFO:     Started server process [8501]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:39380 - "GET /static/medical_rota_ui.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39380 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:39384 - "GET /static/medical_rota_ui.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39384 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+Found 8 COMET eligible doctors:
+
+==================================================
+STEP 1: COMET NIGHT ASSIGNMENTS
+==================================================
+
+🔍 DEBUG: COMET Week 1: 2026-02-09 (Monday) to 2026-02-15 (Sunday)
+   Week has 7 days: Mon 09 to Sun 15
+   📋 Assigning 4-night block to Abdifatah Mohamud: Mon 09 to Thu 12
+   📋 Assigning 3-night block to Manan Kamboj: Fri 13 to Sun 15
+
+🔍 DEBUG: COMET Week 2: 2026-02-23 (Monday) to 2026-03-01 (Sunday)
+   Week has 7 days: Mon 23 to Sun 01
+   📋 Assigning 4-night block to Mahmoud: Mon 23 to Thu 26
+   📋 Assigning 3-night block to Mei Yi Goh: Fri 27 to Sun 01
+
+🔍 DEBUG: COMET Week 3: 2026-03-09 (Monday) to 2026-03-15 (Sunday)
+   Week has 7 days: Mon 09 to Sun 15
+   📋 Assigning 4-night block to Ryan White: Mon 09 to Thu 12
+   📋 Assigning 3-night block to Nikki Francis: Fri 13 to Sun 15
+
+🔍 DEBUG: COMET Week 4: 2026-03-23 (Monday) to 2026-03-29 (Sunday)
+   Week has 7 days: Mon 23 to Sun 29
+   📋 Assigning 4-night block to Reuben Firth: Mon 23 to Thu 26
+   📋 Assigning 3-night block to Hanin El Abbas: Fri 27 to Sun 29
+
+🔍 DEBUG: COMET Week 5: 2026-04-06 (Monday) to 2026-04-12 (Sunday)
+   Week has 7 days: Mon 06 to Sun 12
+   📋 Assigning 4-night block to Manan Kamboj: Mon 06 to Thu 09
+   📋 Assigning 3-night block to Abdifatah Mohamud: Fri 10 to Sun 12
+
+🔍 DEBUG: COMET Week 6: 2026-04-20 (Monday) to 2026-04-26 (Sunday)
+   Week has 7 days: Mon 20 to Sun 26
+   📋 Assigning 4-night block to Mahmoud: Mon 20 to Thu 23
+   📋 Assigning 3-night block to Mei Yi Goh: Fri 24 to Sun 26
+
+🔍 DEBUG: COMET Week 7: 2026-05-04 (Monday) to 2026-05-10 (Sunday)
+   Week has 7 days: Mon 04 to Sun 10
+   📋 Assigning 4-night block to Nikki Francis: Mon 04 to Thu 07
+   📋 Assigning 3-night block to Hanin El Abbas: Fri 08 to Sun 10
+
+🔍 DEBUG: COMET Week 8: 2026-05-18 (Monday) to 2026-05-24 (Sunday)
+   Week has 7 days: Mon 18 to Sun 24
+   📋 Assigning 4-night block to Ryan White: Mon 18 to Thu 21
+   📋 Assigning 3-night block to Reuben Firth: Fri 22 to Sun 24
+
+🔍 DEBUG: COMET Week 9: 2026-06-01 (Monday) to 2026-06-07 (Sunday)
+   Week has 7 days: Mon 01 to Sun 07
+   📋 Assigning 4-night block to Abdifatah Mohamud: Mon 01 to Thu 04
+   📋 Assigning 3-night block to Manan Kamboj: Fri 05 to Sun 07
+
+🔍 DEBUG: COMET Week 10: 2026-06-15 (Monday) to 2026-06-21 (Sunday)
+   Week has 7 days: Mon 15 to Sun 21
+   📋 Assigning 4-night block to Mahmoud: Mon 15 to Thu 18
+   📋 Assigning 3-night block to Mei Yi Goh: Fri 19 to Sun 21
+
+🔍 DEBUG: COMET Week 11: 2026-06-29 (Monday) to 2026-07-05 (Sunday)
+   Week has 7 days: Mon 29 to Sun 05
+   📋 Assigning 4-night block to Hanin El Abbas: Mon 29 to Thu 02
+   📋 Assigning 3-night block to Nikki Francis: Fri 03 to Sun 05
+
+🔍 DEBUG: COMET Week 12: 2026-07-13 (Monday) to 2026-07-19 (Sunday)
+   Week has 7 days: Mon 13 to Sun 19
+   📋 Assigning 4-night block to Reuben Firth: Mon 13 to Thu 16
+   📋 Assigning 3-night block to Manan Kamboj: Fri 17 to Sun 19
+
+🔍 DEBUG: COMET Week 13: 2026-07-27 (Monday) to 2026-08-02 (Sunday)
+   Week has 7 days: Mon 27 to Sun 02
+   📋 Assigning 4-night block to Ryan White: Mon 27 to Thu 30
+   📋 Assigning 3-night block to Abdifatah Mohamud: Fri 31 to Sun 02
+
+COMET Week: 2026-02-09 to 2026-02-15
+  2026-02-09 (Monday): ✓ Abdifatah Mohamud (dr6)
+  2026-02-10 (Tuesday): ✓ Abdifatah Mohamud (dr6)
+  2026-02-11 (Wednesday): ✓ Abdifatah Mohamud (dr6)
+  2026-02-12 (Thursday): ✓ Abdifatah Mohamud (dr6)
+  2026-02-13 (Friday): ✓ Manan Kamboj (dr9)
+  2026-02-14 (Saturday): ✓ Manan Kamboj (dr9)
+  2026-02-15 (Sunday): ✓ Manan Kamboj (dr9)
+
+COMET Week: 2026-02-23 to 2026-03-01
+  2026-02-23 (Monday): ✓ Mahmoud (dr10)
+  2026-02-24 (Tuesday): ✓ Mahmoud (dr10)
+  2026-02-25 (Wednesday): ✓ Mahmoud (dr10)
+  2026-02-26 (Thursday): ✓ Mahmoud (dr10)
+  2026-02-27 (Friday): ✓ Mei Yi Goh (dr1)
+  2026-02-28 (Saturday): ✓ Mei Yi Goh (dr1)
+  2026-03-01 (Sunday): ✓ Mei Yi Goh (dr1)
+
+COMET Week: 2026-03-09 to 2026-03-15
+  2026-03-09 (Monday): ✓ Ryan White (dr2)
+  2026-03-10 (Tuesday): ✓ Ryan White (dr2)
+  2026-03-11 (Wednesday): ✓ Ryan White (dr2)
+  2026-03-12 (Thursday): ✓ Ryan White (dr2)
+  2026-03-13 (Friday): ✓ Nikki Francis (dr3)
+  2026-03-14 (Saturday): ✓ Nikki Francis (dr3)
+  2026-03-15 (Sunday): ✓ Nikki Francis (dr3)
+
+COMET Week: 2026-03-23 to 2026-03-29
+  2026-03-23 (Monday): ✓ Reuben Firth (dr4)
+  2026-03-24 (Tuesday): ✓ Reuben Firth (dr4)
+  2026-03-25 (Wednesday): ✓ Reuben Firth (dr4)
+  2026-03-26 (Thursday): ✓ Reuben Firth (dr4)
+  2026-03-27 (Friday): ✓ Hanin El Abbas (dr7)
+  2026-03-28 (Saturday): ✓ Hanin El Abbas (dr7)
+  2026-03-29 (Sunday): ✓ Hanin El Abbas (dr7)
+
+COMET Week: 2026-04-06 to 2026-04-12
+  2026-04-06 (Monday): ✓ Manan Kamboj (dr9)
+  2026-04-07 (Tuesday): ✓ Manan Kamboj (dr9)
+  2026-04-08 (Wednesday): ✓ Manan Kamboj (dr9)
+  2026-04-09 (Thursday): ✓ Manan Kamboj (dr9)
+  2026-04-10 (Friday): ✓ Abdifatah Mohamud (dr6)
+  2026-04-11 (Saturday): ✓ Abdifatah Mohamud (dr6)
+  2026-04-12 (Sunday): ✓ Abdifatah Mohamud (dr6)
+
+COMET Week: 2026-04-20 to 2026-04-26
+  2026-04-20 (Monday): ✓ Mahmoud (dr10)
+  2026-04-21 (Tuesday): ✓ Mahmoud (dr10)
+  2026-04-22 (Wednesday): ✓ Mahmoud (dr10)
+  2026-04-23 (Thursday): ✓ Mahmoud (dr10)
+  2026-04-24 (Friday): ✓ Mei Yi Goh (dr1)
+  2026-04-25 (Saturday): ✓ Mei Yi Goh (dr1)
+  2026-04-26 (Sunday): ✓ Mei Yi Goh (dr1)
+
+COMET Week: 2026-05-04 to 2026-05-10
+  2026-05-04 (Monday): ✓ Nikki Francis (dr3)
+  2026-05-05 (Tuesday): ✓ Nikki Francis (dr3)
+  2026-05-06 (Wednesday): ✓ Nikki Francis (dr3)
+  2026-05-07 (Thursday): ✓ Nikki Francis (dr3)
+  2026-05-08 (Friday): ✓ Hanin El Abbas (dr7)
+  2026-05-09 (Saturday): ✓ Hanin El Abbas (dr7)
+  2026-05-10 (Sunday): ✓ Hanin El Abbas (dr7)
+
+COMET Week: 2026-05-18 to 2026-05-24
+  2026-05-18 (Monday): ✓ Ryan White (dr2)
+  2026-05-19 (Tuesday): ✓ Ryan White (dr2)
+  2026-05-20 (Wednesday): ✓ Ryan White (dr2)
+  2026-05-21 (Thursday): ✓ Ryan White (dr2)
+  2026-05-22 (Friday): ✓ Reuben Firth (dr4)
+  2026-05-23 (Saturday): ✓ Reuben Firth (dr4)
+  2026-05-24 (Sunday): ✓ Reuben Firth (dr4)
+
+COMET Week: 2026-06-01 to 2026-06-07
+  2026-06-01 (Monday): ✓ Abdifatah Mohamud (dr6)
+  2026-06-02 (Tuesday): ✓ Abdifatah Mohamud (dr6)
+  2026-06-03 (Wednesday): ✓ Abdifatah Mohamud (dr6)
+  2026-06-04 (Thursday): ✓ Abdifatah Mohamud (dr6)
+  2026-06-05 (Friday): ✓ Manan Kamboj (dr9)
+  2026-06-06 (Saturday): ✓ Manan Kamboj (dr9)
+  2026-06-07 (Sunday): ✓ Manan Kamboj (dr9)
+
+COMET Week: 2026-06-15 to 2026-06-21
+  2026-06-15 (Monday): ✓ Mahmoud (dr10)
+  2026-06-16 (Tuesday): ✓ Mahmoud (dr10)
+  2026-06-17 (Wednesday): ✓ Mahmoud (dr10)
+  2026-06-18 (Thursday): ✓ Mahmoud (dr10)
+  2026-06-19 (Friday): ✓ Mei Yi Goh (dr1)
+  2026-06-20 (Saturday): ✓ Mei Yi Goh (dr1)
+  2026-06-21 (Sunday): ✓ Mei Yi Goh (dr1)
+
+COMET Week: 2026-06-29 to 2026-07-05
+  2026-06-29 (Monday): ✓ Hanin El Abbas (dr7)
+  2026-06-30 (Tuesday): ✓ Hanin El Abbas (dr7)
+  2026-07-01 (Wednesday): ✓ Hanin El Abbas (dr7)
+  2026-07-02 (Thursday): ✓ Hanin El Abbas (dr7)
+  2026-07-03 (Friday): ✓ Nikki Francis (dr3)
+  2026-07-04 (Saturday): ✓ Nikki Francis (dr3)
+  2026-07-05 (Sunday): ✓ Nikki Francis (dr3)
+
+COMET Week: 2026-07-13 to 2026-07-19
+  2026-07-13 (Monday): ✓ Reuben Firth (dr4)
+  2026-07-14 (Tuesday): ✓ Reuben Firth (dr4)
+  2026-07-15 (Wednesday): ✓ Reuben Firth (dr4)
+  2026-07-16 (Thursday): ✓ Reuben Firth (dr4)
+  2026-07-17 (Friday): ✓ Manan Kamboj (dr9)
+  2026-07-18 (Saturday): ✓ Manan Kamboj (dr9)
+  2026-07-19 (Sunday): ✓ Manan Kamboj (dr9)
+
+COMET Week: 2026-07-27 to 2026-08-02
+  2026-07-27 (Monday): ✓ Ryan White (dr2)
+  2026-07-28 (Tuesday): ✓ Ryan White (dr2)
+  2026-07-29 (Wednesday): ✓ Ryan White (dr2)
+  2026-07-30 (Thursday): ✓ Ryan White (dr2)
+  2026-07-31 (Friday): ✓ Abdifatah Mohamud (dr6)
+  2026-08-01 (Saturday): ✓ Abdifatah Mohamud (dr6)
+  2026-08-02 (Sunday): ✓ Abdifatah Mohamud (dr6)
+
+==================================================
+✅ ALL COMET WEEKS FULLY COVERED
+
+Final COMET Night assignments:
+  Mei Yi Goh: 9 CMN shifts (WTE-adjusted: 11.2)
+  Ryan White: 12 CMN shifts (WTE-adjusted: 15.0)
+  Nikki Francis: 10 CMN shifts (WTE-adjusted: 12.5)
+  Reuben Firth: 11 CMN shifts (WTE-adjusted: 13.8)
+  Abdifatah Mohamud: 14 CMN shifts (WTE-adjusted: 14.0)
+  Hanin El Abbas: 10 CMN shifts (WTE-adjusted: 12.5)
+  Manan Kamboj: 13 CMN shifts (WTE-adjusted: 13.0)
+  Mahmoud: 12 CMN shifts (WTE-adjusted: 12.0)
+
+Total COMET nights assigned: 91
+INFO:     127.0.0.1:39384 - "POST /solve_sequential HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39384 - "POST /check_constraints HTTP/1.1" 200 OK
+
+Starting CP-SAT solver v9.10.4067
+Parameters: max_time_in_seconds: 300 log_search_progress: true relative_gap_limit: 0.05
+Setting number of workers to 2
+
+Initial optimization model '': (model_fingerprint: 0x2c4af167d7be1441)
+#Variables: 18'861 (#bools: 15'457 #ints: 1 in objective)
+  - 18'860 Booleans in [0,1]
+  - 1 in [0,181000]
+#kLinear1: 29'458 (#enforced: 29'458 #multi: 16'294)
+#kLinear2: 8'350 (#enforced: 8'350 #multi: 3'298)
+#kLinear3: 3'766 (#enforced: 3'766)
+#kLinearN: 5'961 (#enforced: 4'188) (#terms: 31'456)
+
+Starting presolve at 0.01s
+  1.17e-02s  0.00e+00d  [DetectDominanceRelations] 
+  1.28e-01s  0.00e+00d  [PresolveToFixPoint] #num_loops=3 #num_dual_strengthening=2 
+  2.60e-04s  0.00e+00d  [ExtractEncodingFromLinear] #potential_supersets=181 
+[Symmetry] Graph for symmetry has 88'660 nodes and 210'411 arcs.
+[Symmetry] Symmetry computation done. time: 0.0446968 dtime: 0.0666223
+[Symmetry] #generators: 2, average support size: 4096
+[Symmetry] 2048 orbits with sizes: 3,3,3,3,3,3,3,3,3,3,...
+[Symmetry] Num fixable by binary propagation in orbit: 2 / 3
+[Symmetry] Found orbitope of size 2048 x 3
+[SAT presolve] num removable Booleans: 1684 / 18860
+[SAT presolve] num trivial clauses: 0
+[SAT presolve] [0s] clauses:62183 literals:166909 vars:18809 one_side_vars:14 simple_definition:15398 singleton_clauses:0
+[SAT presolve] [0.00488699s] clauses:58811 literals:145387 vars:18809 one_side_vars:1693 simple_definition:13754 singleton_clauses:1693
+[SAT presolve] [0.00676317s] clauses:58638 literals:145006 vars:18740 one_side_vars:1693 simple_definition:13719 singleton_clauses:1693
+  6.74e-01s  6.44e-01d  [Probe] #probed=34'232 #fixed_bools=1'693 #equiv=734 #new_binary_clauses=22'916 
+  4.03e-01s  0.00e+00d  [MaxClique] Merged 40046(80092 literals) into 27567(127703 literals) at_most_ones. 
+  1.13e-02s  0.00e+00d  [DetectDominanceRelations] 
+  4.17e-02s  0.00e+00d  [PresolveToFixPoint] #num_loops=1 #num_dual_strengthening=1 
+  7.96e-03s  0.00e+00d  [ProcessAtMostOneAndLinear] 
+  1.98e-02s  0.00e+00d  [DetectDuplicateConstraints] #duplicates=732 
+  9.19e-04s  5.18e-06d  [DetectDominatedLinearConstraints] #relevant_constraints=11 
+  4.67e-04s  0.00e+00d  [DetectDifferentVariables] 
+  1.72e-02s  6.63e-04d  [ProcessSetPPC] #relevant_constraints=43'922 #num_inclusions=6'337 
+  9.13e-04s  0.00e+00d  [FindAlmostIdenticalLinearConstraints] 
+  9.23e-03s  6.88e-03d  [FindBigAtMostOneAndLinearOverlap] 
+  2.25e-03s  2.40e-03d  [FindBigVerticalLinearOverlap] 
+  6.54e-04s  9.50e-05d  [FindBigHorizontalLinearOverlap] #linears=11 
+  5.44e-03s  2.99e-04d  [MergeClauses] #num_collisions=957 #num_merges=957 #num_saved_literals=3'828 
+  1.15e-02s  0.00e+00d  [DetectDominanceRelations] 
+  3.07e-02s  0.00e+00d  [PresolveToFixPoint] #num_loops=1 #num_dual_strengthening=1 
+  2.19e-02s  0.00e+00d  [DetectDominanceRelations] 
+  5.01e-02s  0.00e+00d  [PresolveToFixPoint] #num_loops=1 #num_dual_strengthening=1 
+[Symmetry] Graph for symmetry has 74'827 nodes and 206'513 arcs.
+[Symmetry] Symmetry computation done. time: 0.021862 dtime: 0.0460156
+[SAT presolve] num removable Booleans: 0 / 16313
+[SAT presolve] num trivial clauses: 0
+[SAT presolve] [0s] clauses:22504 literals:72539 vars:16313 one_side_vars:6652 simple_definition:6335 singleton_clauses:0
+[SAT presolve] [0.00212635s] clauses:22504 literals:72539 vars:16313 one_side_vars:6652 simple_definition:6335 singleton_clauses:0
+[SAT presolve] [0.00312167s] clauses:22504 literals:72539 vars:16313 one_side_vars:6652 simple_definition:6335 singleton_clauses:0
+  7.22e-01s  6.52e-01d  [Probe] #probed=34'232 #new_binary_clauses=14'428 
+  4.44e-01s  0.00e+00d  [MaxClique] 
+  1.36e-02s  0.00e+00d  [DetectDominanceRelations] 
+  3.56e-02s  0.00e+00d  [PresolveToFixPoint] #num_loops=1 #num_dual_strengthening=1 
+  1.24e-02s  0.00e+00d  [ProcessAtMostOneAndLinear] 
+  3.17e-02s  0.00e+00d  [DetectDuplicateConstraints] 
+  1.61e-03s  5.18e-06d  [DetectDominatedLinearConstraints] #relevant_constraints=11 
+  9.86e-04s  0.00e+00d  [DetectDifferentVariables] 
+  1.76e-02s  6.63e-04d  [ProcessSetPPC] #relevant_constraints=43'922 #num_inclusions=6'337 
+  1.23e-03s  0.00e+00d  [FindAlmostIdenticalLinearConstraints] 
+  1.24e-02s  6.86e-03d  [FindBigAtMostOneAndLinearOverlap] 
+  2.39e-03s  2.40e-03d  [FindBigVerticalLinearOverlap] 
+  1.15e-03s  9.50e-05d  [FindBigHorizontalLinearOverlap] #linears=11 
+  5.99e-03s  2.99e-04d  [MergeClauses] #num_collisions=957 #num_merges=957 #num_saved_literals=3'828 
+  1.47e-02s  0.00e+00d  [DetectDominanceRelations] 
+  3.57e-02s  0.00e+00d  [PresolveToFixPoint] #num_loops=1 #num_dual_strengthening=1 
+  4.57e-03s  0.00e+00d  [ExpandObjective] #entries=14'606 #tight_variables=1'716 #tight_constraints=181 
+
+Presolve summary:
+  - 734 affine relations were detected.
+  - rule 'TODO dual: only one blocking constraint?' was applied 43'620 times.
+  - rule 'TODO dual: only one unspecified blocking constraint?' was applied 1'399 times.
+  - rule 'TODO linear2: contains a Boolean.' was applied 10'034 times.
+  - rule 'affine: new relation' was applied 734 times.
+  - rule 'at_most_one: transformed into max clique.' was applied 1 time.
+  - rule 'bool_or: always true' was applied 1'693 times.
+  - rule 'bool_or: removed enforcement literal' was applied 8'994 times.
+  - rule 'deductions: 32232 stored' was applied 1 time.
+  - rule 'dual: reduced domain' was applied 1 time.
+  - rule 'duplicate: removed constraint' was applied 732 times.
+  - rule 'exactly_one: removed literals' was applied 2 times.
+  - rule 'linear2: implied ax + by = cte has only one solution' was applied 3'333 times.
+  - rule 'linear: fixed or dup variables' was applied 2 times.
+  - rule 'linear: negative clause' was applied 8'915 times.
+  - rule 'linear: negative reified and' was applied 11 times.
+  - rule 'linear: positive clause' was applied 1'660 times.
+  - rule 'linear: positive equal one' was applied 181 times.
+  - rule 'linear: positive reified and' was applied 3'966 times.
+  - rule 'linear: simplified rhs' was applied 10'597 times.
+  - rule 'objective: variable not used elsewhere' was applied 1'738 times.
+  - rule 'presolve: 1813 unused variables removed.' was applied 1 time.
+  - rule 'presolve: iteration' was applied 2 times.
+  - rule 'symmetry: fixed to false' was applied 3 times.
+
+Presolved optimization model '': (model_fingerprint: 0xec4795b4df465c90)
+#Variables: 16'314 (#bools: 13'023 #ints: 1 in objective)
+  - 16'313 Booleans in [0,1]
+  - 1 in [0,30046]
+#kAtMostOne: 21'226 (#literals: 115'021)
+#kBoolAnd: 2'441 (#enforced: 2'441 #multi: 827) (#literals: 13'043)
+#kBoolOr: 14'383 (#literals: 50'945)
+#kExactlyOne: 181 (#literals: 1'716)
+#kLinearN: 11 (#terms: 1'727)
+
+Preloading model.
+#Bound   3.01s best:-inf  next:[-176250600,93336500] initial_domain
+[Symmetry] Graph for symmetry has 72'280 nodes and 206'513 arcs.
+[Symmetry] Symmetry computation done. time: 0.025543 dtime: 0.0458627
+#Model   3.06s var:16314/16314 constraints:38242/38242
+
+Starting search at 3.06s with 2 workers.
+1 full problem subsolver: [default_lp]
+9 incomplete subsolvers: [feasibility_pump, graph_arc_lns, graph_cst_lns, graph_dec_lns, graph_var_lns, rins/rens, rnd_cst_lns, rnd_var_lns, violation_ls]
+3 helper subsolvers: [neighborhood_helper, synchronization_agent, update_gap_integral]
+#Bound   5.71s best:-inf  next:[-176250600,87590500] default_lp (initial_propagation)
+#Bound   5.73s best:-inf  next:[-176250600,85420500] default_lp
+#Bound   5.75s best:-inf  next:[-176250600,80677500] default_lp
+#Bound   5.76s best:-inf  next:[-176250600,75877500] default_lp
+#Bound   5.80s best:-inf  next:[-176250600,60901000] default_lp
+#1       6.41s best:-760600 next:[-760500,60901000] rens_pump_lns (d=0.50 s=8 t=0.10 p=0.00 stall=0 h=auto_l0) [presolve]
+#2       6.71s best:-696600 next:[-696500,60901000] violation_ls(batch:1 #solutions_imported:1 #lin_moves:0 #lin_evals:13'670 #gen_moves:305 #gen_evals:0 #comp_moves:9 #backtracks:148 #weight_updates:0)
+#3       6.82s best:819000 next:[819100,60901000] rnd_var_lns (d=0.50 s=10 t=0.10 p=0.00 stall=0 h=auto_l0) [presolve]
+#4       7.08s best:965300 next:[965400,60901000] rnd_cst_lns (d=0.50 s=11 t=0.10 p=0.00 stall=0 h=auto_l0)
+#5       7.58s best:1505500 next:[1505600,60901000] graph_var_lns (d=0.50 s=12 t=0.10 p=0.00 stall=0 h=auto_l0)
+#6       8.52s best:1715300 next:[1715400,60901000] graph_cst_lns (d=0.50 s=14 t=0.10 p=0.00 stall=0 h=auto_l0)
+#7       8.73s best:1745300 next:[1745400,60901000] graph_dec_lns (d=0.50 s=15 t=0.10 p=0.00 stall=0 h=auto_l0) [hint]
+#8       8.79s best:1829300 next:[1829400,60901000] violation_ls(batch:2 #solutions_imported:2 #lin_moves:134 #lin_evals:26'855 #gen_moves:305 #gen_evals:0 #comp_moves:9 #backtracks:148 #weight_updates:125)
+#9       9.08s best:2214700 next:[2214800,60901000] rnd_var_lns (d=0.71 s=17 t=0.10 p=1.00 stall=0 h=auto_l0)
+#10      9.87s best:2266300 next:[2266400,60901000] rnd_cst_lns (d=0.71 s=18 t=0.10 p=1.00 stall=0 h=auto_l0)
+#11     10.23s best:2370500 next:[2370600,60901000] graph_var_lns (d=0.29 s=19 t=0.10 p=0.00 stall=0 h=auto_l0)
+#Bound  11.16s best:2370500 next:[2370600,55160500] default_lp
+#Bound  11.18s best:2370500 next:[2370600,53817200] default_lp
+#Bound  11.24s best:2370500 next:[2370600,51572100] default_lp
+#Bound  11.31s best:2370500 next:[2370600,46138300] default_lp
+#Bound  11.38s best:2370500 next:[2370600,43047000] default_lp
+#Bound  11.43s best:2370500 next:[2370600,40786300] default_lp
+#Bound  11.48s best:2370500 next:[2370600,38817200] default_lp
+#Bound  11.53s best:2370500 next:[2370600,36931200] default_lp
+#Bound  11.60s best:2370500 next:[2370600,35170700] default_lp
+#Bound  11.68s best:2370500 next:[2370600,33267500] default_lp
+#Bound  11.78s best:2370500 next:[2370600,32154200] default_lp
+#Bound  11.87s best:2370500 next:[2370600,31630800] default_lp
+#Bound  12.03s best:2370500 next:[2370600,30767100] default_lp
+#Bound  12.13s best:2370500 next:[2370600,29670700] default_lp
+#Bound  12.24s best:2370500 next:[2370600,28434100] default_lp
+#Bound  12.34s best:2370500 next:[2370600,27175300] default_lp
+#Bound  12.49s best:2370500 next:[2370600,25864000] default_lp
+#Bound  12.60s best:2370500 next:[2370600,24244100] default_lp
+#Bound  12.69s best:2370500 next:[2370600,21617400] default_lp
+#Bound  12.84s best:2370500 next:[2370600,20210800] default_lp
+#Bound  12.96s best:2370500 next:[2370600,19702300] default_lp
+#Bound  13.10s best:2370500 next:[2370600,19372200] default_lp
+#Bound  13.24s best:2370500 next:[2370600,18242700] default_lp
+#12     13.37s best:2373500 next:[2373600,18242700] violation_ls(batch:3 #solutions_imported:3 #lin_moves:356 #lin_evals:40'087 #gen_moves:305 #gen_evals:0 #comp_moves:9 #backtracks:148 #weight_updates:349)
+#Bound  13.37s best:2373500 next:[2373600,17839800] default_lp
+#Bound  13.46s best:2373500 next:[2373600,17743000] default_lp
+#Bound  13.58s best:2373500 next:[2373600,17375700] default_lp
+#Bound  13.70s best:2373500 next:[2373600,16768200] default_lp
+#Bound  13.84s best:2373500 next:[2373600,15861100] default_lp
+#Bound  13.99s best:2373500 next:[2373600,15145700] default_lp [skipped_logs=0]
+#13     14.54s best:2469100 next:[2469200,13998600] rnd_cst_lns (d=0.54 s=25 t=0.10 p=0.50 stall=0 h=auto_l0)
+#Bound  14.86s best:2469100 next:[2469200,12738600] default_lp [skipped_logs=4]
+#14     15.11s best:2474100 next:[2474200,12738600] graph_var_lns (d=0.46 s=26 t=0.10 p=0.50 stall=0 h=auto_l0) [hint]
+#15     15.98s best:2538300 next:[2538400,12062300] graph_cst_lns (d=0.54 s=28 t=0.10 p=0.50 stall=1 h=auto_l0)
+Found 11 unit night eligible registrars:
+
+📋 UNIT NIGHT REGISTRAR KEY:
+  dr1 = Mei Yi Goh (WTE: 0.8)
+  dr2 = Ryan White (WTE: 0.8)
+  dr3 = Nikki Francis (WTE: 0.8)
+  dr4 = Reuben Firth (WTE: 0.8)
+  dr5 = Alexander Yule (WTE: 0.6)
+  dr6 = Abdifatah Mohamud (WTE: 1.0)
+  dr7 = Hanin El Abbas (WTE: 0.8)
+  dr8 = Sarah Hallett (WTE: 0.6)
+  dr9 = Manan Kamboj (WTE: 1.0)
+  dr10 = Mahmoud (WTE: 1.0)
+  dr11 = Sarah Walker (WTE: 0.6)
+
+  Mei Yi Goh (WTE: 0.8)
+  Ryan White (WTE: 0.8)
+  Nikki Francis (WTE: 0.8)
+  Reuben Firth (WTE: 0.8)
+  Alexander Yule (WTE: 0.6)
+  Abdifatah Mohamud (WTE: 1.0)
+  Hanin El Abbas (WTE: 0.8)
+  Sarah Hallett (WTE: 0.6)
+  Manan Kamboj (WTE: 1.0)
+  Mahmoud (WTE: 1.0)
+  Sarah Walker (WTE: 0.6)
+
+Unit night days to cover: 181
+COMET days (also covered): 91
+Total days: 181
+Total unit nights to assign: 181
+Target per registrar (equal distribution): 16.5
+
+================================================================================
+⚠️  FULL PERIOD OPTIMIZATION ENABLED
+================================================================================
+Processing entire 6-month roster in ONE optimization pass
+Benefits:
+  ✅ Perfect gap detection across ALL night blocks (no chunk boundaries)
+  ✅ Global optimization for weekend continuity
+  ✅ Better long-term rotation patterns
+Expected solve time: 2-5 minutes (timeout: 300s)
+================================================================================
+
+
+==================================================
+STEP 1: UNIT NIGHT ASSIGNMENTS
+==================================================
+
+🔧 Processing FULL PERIOD: 181 days (2026-02-04 to 2026-08-03)
+   Using extended timeout: 300 seconds
+   This allows perfect gap detection across entire 6-month roster
+   🔧 Building CP-SAT model for 181 nights, 11 registrars
+      🔍 Gap check for Mei Yi Goh on 2026-03-02: block ended 2026-03-01, 0 rest days (prefer 5)
+      🔍 Gap check for Mei Yi Goh on 2026-03-03: block ended 2026-03-01, 1 rest days (prefer 5)
+      🔍 Gap check for Mei Yi Goh on 2026-04-27: block ended 2026-04-26, 0 rest days (prefer 5)
+      🔍 Gap check for Mei Yi Goh on 2026-04-28: block ended 2026-04-26, 1 rest days (prefer 5)
+      🔍 Gap check for Mei Yi Goh on 2026-06-22: block ended 2026-06-21, 0 rest days (prefer 5)
+      🔍 Gap check for Mei Yi Goh on 2026-06-23: block ended 2026-06-21, 1 rest days (prefer 5)
+      🔍 Gap check for Ryan White on 2026-03-13: block ended 2026-03-12, 0 rest days (prefer 5)
+      🔍 Gap check for Ryan White on 2026-03-14: block ended 2026-03-12, 1 rest days (prefer 5)
+      🔍 Gap check for Ryan White on 2026-05-22: block ended 2026-05-21, 0 rest days (prefer 5)
+      🔍 Gap check for Ryan White on 2026-05-23: block ended 2026-05-21, 1 rest days (prefer 5)
+      🔍 Gap check for Ryan White on 2026-07-31: block ended 2026-07-30, 0 rest days (prefer 5)
+      🔍 Gap check for Ryan White on 2026-08-01: block ended 2026-07-30, 1 rest days (prefer 5)
+      🔍 Gap check for Nikki Francis on 2026-03-16: block ended 2026-03-15, 0 rest days (prefer 5)
+      🔍 Gap check for Nikki Francis on 2026-03-17: block ended 2026-03-15, 1 rest days (prefer 5)
+      🔍 Gap check for Nikki Francis on 2026-05-08: block ended 2026-05-07, 0 rest days (prefer 5)
+      🔍 Gap check for Nikki Francis on 2026-05-09: block ended 2026-05-07, 1 rest days (prefer 5)
+      🔍 Gap check for Nikki Francis on 2026-07-06: block ended 2026-07-05, 0 rest days (prefer 5)
+      🔍 Gap check for Nikki Francis on 2026-07-07: block ended 2026-07-05, 1 rest days (prefer 5)
+      🔍 Gap check for Reuben Firth on 2026-03-27: block ended 2026-03-26, 0 rest days (prefer 5)
+      🔍 Gap check for Reuben Firth on 2026-03-28: block ended 2026-03-26, 1 rest days (prefer 5)
+      🔍 Gap check for Reuben Firth on 2026-05-25: block ended 2026-05-24, 0 rest days (prefer 5)
+      🔍 Gap check for Reuben Firth on 2026-05-26: block ended 2026-05-24, 1 rest days (prefer 5)
+      🔍 Gap check for Reuben Firth on 2026-07-17: block ended 2026-07-16, 0 rest days (prefer 5)
+      🔍 Gap check for Reuben Firth on 2026-07-18: block ended 2026-07-16, 1 rest days (prefer 5)
+      🔍 Gap check for Abdifatah Mohamud on 2026-02-13: block ended 2026-02-12, 0 rest days (prefer 5)
+      🔍 Gap check for Abdifatah Mohamud on 2026-02-14: block ended 2026-02-12, 1 rest days (prefer 5)
+      🔍 Gap check for Abdifatah Mohamud on 2026-04-13: block ended 2026-04-12, 0 rest days (prefer 5)
+      🔍 Gap check for Abdifatah Mohamud on 2026-04-14: block ended 2026-04-12, 1 rest days (prefer 5)
+      🔍 Gap check for Abdifatah Mohamud on 2026-06-05: block ended 2026-06-04, 0 rest days (prefer 5)
+      🔍 Gap check for Abdifatah Mohamud on 2026-06-06: block ended 2026-06-04, 1 rest days (prefer 5)
+      🔍 Gap check for Abdifatah Mohamud on 2026-08-03: block ended 2026-08-02, 0 rest days (prefer 5)
+      🔍 Gap check for Hanin El Abbas on 2026-03-30: block ended 2026-03-29, 0 rest days (prefer 5)
+      🔍 Gap check for Hanin El Abbas on 2026-03-31: block ended 2026-03-29, 1 rest days (prefer 5)
+      🔍 Gap check for Hanin El Abbas on 2026-05-11: block ended 2026-05-10, 0 rest days (prefer 5)
+      🔍 Gap check for Hanin El Abbas on 2026-05-12: block ended 2026-05-10, 1 rest days (prefer 5)
+      🔍 Gap check for Hanin El Abbas on 2026-07-03: block ended 2026-07-02, 0 rest days (prefer 5)
+      🔍 Gap check for Hanin El Abbas on 2026-07-04: block ended 2026-07-02, 1 rest days (prefer 5)
+      🔍 Gap check for Manan Kamboj on 2026-02-16: block ended 2026-02-15, 0 rest days (prefer 5)
+      🔍 Gap check for Manan Kamboj on 2026-02-17: block ended 2026-02-15, 1 rest days (prefer 5)
+      🔍 Gap check for Manan Kamboj on 2026-04-10: block ended 2026-04-09, 0 rest days (prefer 5)
+      🔍 Gap check for Manan Kamboj on 2026-04-11: block ended 2026-04-09, 1 rest days (prefer 5)
+      🔍 Gap check for Manan Kamboj on 2026-06-08: block ended 2026-06-07, 0 rest days (prefer 5)
+      🔍 Gap check for Manan Kamboj on 2026-06-09: block ended 2026-06-07, 1 rest days (prefer 5)
+      🔍 Gap check for Manan Kamboj on 2026-07-20: block ended 2026-07-19, 0 rest days (prefer 5)
+      🔍 Gap check for Manan Kamboj on 2026-07-21: block ended 2026-07-19, 1 rest days (prefer 5)
+      🔍 Gap check for Mahmoud on 2026-02-27: block ended 2026-02-26, 0 rest days (prefer 5)
+      🔍 Gap check for Mahmoud on 2026-02-28: block ended 2026-02-26, 1 rest days (prefer 5)
+      🔍 Gap check for Mahmoud on 2026-04-24: block ended 2026-04-23, 0 rest days (prefer 5)
+      🔍 Gap check for Mahmoud on 2026-04-25: block ended 2026-04-23, 1 rest days (prefer 5)
+      🔍 Gap check for Mahmoud on 2026-06-19: block ended 2026-06-18, 0 rest days (prefer 5)
+      🔍 Gap check for Mahmoud on 2026-06-20: block ended 2026-06-18, 1 rest days (prefer 5)
+   Added 8077 SOFT gap constraints (prefer 5 days) across 181 days
+   ✅ Gaps <5 days are allowed but penalized - solver has more flexibility
+   Added 702 WEEKEND PATTERN bonuses (HIGHEST PRIORITY)
+   ✅ Weekend blocks (Fri-Sat-Sun, Fri-Sat-Sun-Mon, Thu-Fri-Sat-Sun) strongly incentivized
+   ⚠️  Skipping 72-hour weekly max constraints (problem size: 181 days)
+      Will be checked post-solve in constraint validator
+   🎯 'Good enough' stopping: Will stop at 5% from optimal (faster results)
+   ⏳ Solving with CP-SAT (timeout: 300s)...
+   🔄 Found solution #1, objective value: -760600
+   🔄 Found solution #2, objective value: -696600
+   🔄 Found solution #3, objective value: 819000
+   🔄 Found solution #4, objective value: 965300
+   🔄 Found solution #5, objective value: 1505500
+   🔄 Found solution #6, objective value: 1715300
+   🔄 Found solution #7, objective value: 1745300
+   🔄 Found solution #8, objective value: 1829300
+   🔄 Found solution #9, objective value: 2214700
+   🔄 Found solution #10, objective value: 2266300
+   🔄 Found solution #11, objective value: 2370500
+   🔄 Found solution #12, objective value: 2373500
+   🔄 Found solution #13, objective value: 2469100
+   🔄 Found solution #14, objective value: 2474100
+   🔄 Found solution #15, objective value: 2538300#Bound  16.09s best:2538300 next:[2538400,11457500] default_lp [skipped_logs=2]
+#16     16.24s best:2551300 next:[2551400,11457500] graph_dec_lns (d=0.54 s=29 t=0.10 p=0.50 stall=1 h=auto_l0) [hint]
+#Bound  16.70s best:2551300 next:[2551400,11183900] default_lp [skipped_logs=0]
+#17     17.22s best:2648300 next:[2648400,11183900] violation_ls(batch:4 #solutions_imported:4 #lin_moves:356 #lin_evals:61'294 #gen_moves:1'879 #gen_evals:0 #comp_moves:15 #backtracks:932 #weight_updates:349)
+#18     17.47s best:2735300 next:[2735400,11183900] rnd_var_lns (d=0.72 s=31 t=0.10 p=0.67 stall=1 h=auto_l0)
+#Bound  17.48s best:2735300 next:[2735400,10816200] default_lp [skipped_logs=0]
+#19     18.86s best:2739300 next:[2739400,10489200] graph_var_lns (d=0.31 s=33 t=0.10 p=0.33 stall=0 h=auto_l0)
+#Bound  18.16s best:2735300 next:[2735400,10489200] default_lp [skipped_logs=0]
+#Bound  19.97s best:2739300 next:[2739400,9686900] default_lp [skipped_logs=1]
+#20     21.08s best:2825300 next:[2825400,9413400] graph_dec_lns (d=0.69 s=36 t=0.10 p=0.67 stall=0 h=auto_l0)
+#Bound  20.77s best:2739300 next:[2739400,9413400] default_lp [skipped_logs=0]
+#Bound  22.29s best:2825300 next:[2825400,8921700] default_lp
+#Bound  22.95s best:2825300 next:[2825400,8668400] default_lp [skipped_logs=0]
+#Bound  24.24s best:2825300 next:[2825400,8189300] default_lp
+#Bound  24.83s best:2825300 next:[2825400,7672500] default_lp [skipped_logs=0]
+#21     25.78s best:2896900 next:[2897000,7672500] rnd_var_lns (d=0.81 s=40 t=0.10 p=0.75 stall=0 h=auto_l0)
+#22     26.00s best:3103500 next:[3103600,7672500] rnd_cst_lns (d=0.55 s=41 t=0.10 p=0.50 stall=1 h=auto_l0) [hint]
+#Bound  26.10s best:3103500 next:[3103600,7221200] default_lp
+#23     26.24s best:3161300 next:[3161400,7221200] graph_var_lns (d=0.21 s=42 t=0.10 p=0.25 stall=0 h=auto_l0)
+#24     26.54s best:3376300 next:[3376400,7221200] graph_arc_lns (d=0.09 s=43 t=0.10 p=0.00 stall=4 h=auto_l0)
+#25     26.92s best:3589300 next:[3589400,7221200] graph_cst_lns (d=0.55 s=44 t=0.10 p=0.50 stall=1 h=auto_l0)
+#26     27.16s best:3615300 next:[3615400,7221200] graph_dec_lns (d=0.55 s=45 t=0.10 p=0.50 stall=0 h=auto_l0) [hint]
+#Bound  27.68s best:3615300 next:[3615400,7166800] default_lp
+#27     29.80s best:3615400 next:[3615500,7166800] violation_ls(batch:6 #solutions_imported:6 #lin_moves:357 #lin_evals:116'685 #gen_moves:5'715 #gen_evals:0 #comp_moves:15 #backtracks:2'848 #weight_updates:349)
+#Bound  30.09s best:3615400 next:[3615500,7044700] default_lp
+#28     30.12s best:3923200 next:[3923300,7044700] rnd_var_lns (d=0.73 s=49 t=0.10 p=0.60 stall=0 h=auto_l0)
+#29     31.16s best:3994200 next:[3994300,7044700] graph_var_lns (d=0.30 s=51 t=0.10 p=0.40 stall=0 h=auto_l0)
+#Bound  32.36s best:3994200 next:[3994300,7005800] default_lp
+#30     33.02s best:4111100 next:[4111200,7005800] graph_dec_lns (d=0.68 s=54 t=0.10 p=0.60 stall=0 h=auto_l0)
+#31     35.28s best:4161100 next:[4161200,7005800] violation_ls(batch:7 #solutions_imported:7 #lin_moves:484 #lin_evals:129'848 #gen_moves:5'715 #gen_evals:0 #comp_moves:15 #backtracks:2'848 #weight_updates:402)
+#Bound  35.81s best:4161100 next:[4161200,6901200] default_lp
+#32     36.35s best:4194300 next:[4194400,6901200] rnd_cst_lns (d=0.56 s=59 t=0.10 p=0.50 stall=1 h=auto_l0) [hint]
+#33     36.92s best:4344300 next:[4344400,6901200] graph_var_lns (d=0.41 s=60 t=0.10 p=0.50 stall=0 h=auto_l0)
+#34     37.18s best:4352300 next:[4352400,6901200] graph_arc_lns (d=0.09 s=61 t=0.10 p=0.17 stall=1 h=auto_l0)
+#35     37.39s best:4424700 next:[4424800,6901200] graph_cst_lns (d=0.56 s=62 t=0.10 p=0.50 stall=1 h=auto_l0)
+#Bound  37.42s best:4424700 next:[4424800,6832300] default_lp
+#Bound  41.13s best:4424700 next:[4424800,6757200] default_lp
+#36     42.83s best:4485700 next:[4485800,6757200] rnd_var_lns (d=0.73 s=67 t=0.10 p=0.57 stall=1 h=auto_l0)
+#37     44.38s best:4491700 next:[4491800,6757200] graph_arc_lns (d=0.12 s=70 t=0.10 p=0.29 stall=0 h=auto_l0)
+#Bound  44.49s best:4491700 next:[4491800,6712700] default_lp
+#38     45.70s best:4555700 next:[4555800,6712700] graph_dec_lns (d=0.69 s=72 t=0.10 p=0.57 stall=1 h=auto_l0)
+#39     48.06s best:4652700 next:[4652800,6712700] violation_ls(batch:9 #solutions_imported:9 #lin_moves:710 #lin_evals:189'916 #gen_moves:10'256 #gen_evals:0 #comp_moves:15 #backtracks:5'118 #weight_updates:487)
+#40     49.19s best:4669700 next:[4669800,6712700] rnd_cst_lns (d=0.57 s=77 t=0.10 p=0.50 stall=1 h=auto_l0)
+#Bound  50.76s best:4669700 next:[4669800,6657400] default_lp
+#41     53.13s best:4795700 next:[4795800,6657400] rins_pump_lns (d=0.25 s=83 t=0.10 p=0.25 stall=3 h=auto_l0)
+#Bound  53.56s best:4795700 next:[4795800,6638100] default_lp
+#42     57.63s best:4809700 next:[4809800,6638100] graph_arc_lns (d=0.07 s=88 t=0.10 p=0.22 stall=1 h=auto_l0)
+#Bound  61.41s best:4809700 next:[4809800,6609200] default_lp
+#43     64.63s best:4820700 next:[4820800,6609200] graph_arc_lns (d=0.09 s=97 t=0.10 p=0.30 stall=0 h=auto_l0)
+#Bound  67.34s best:4820700 next:[4820800,6592300] default_lp
+#44     71.36s best:4855700 next:[4855800,6592300] rnd_var_lns (d=0.74 s=103 t=0.10 p=0.55 stall=3 h=auto_l0)
+#Bound  78.54s best:4855700 next:[4855800,6568700] default_lp
+#45     84.97s best:4885700 next:[4885800,6568700] violation_ls(batch:14 #solutions_imported:13 #lin_moves:18'065 #lin_evals:335'426 #gen_moves:19'583 #gen_evals:0 #comp_moves:15 #backtracks:9'781 #weight_updates:4'653)
+#46     87.09s best:4893700 next:[4893800,6568700] graph_dec_lns (d=0.70 s=126 t=0.10 p=0.54 stall=5 h=auto_l0)
+#Bound  88.07s best:4893700 next:[4893800,6554900] default_lp
+#47     92.49s best:4942500 next:[4942600,6554900] rnd_cst_lns (d=0.58 s=131 t=0.10 p=0.50 stall=5 h=auto_l0)
+#48     92.98s best:4952500 next:[4952600,6554900] graph_arc_lns (d=0.09 s=133 t=0.10 p=0.36 stall=3 h=auto_l0)
+#49     96.10s best:4957100 next:[4957200,6554900] rins_pump_lns (d=0.24 s=137 t=0.10 p=0.33 stall=1 h=auto_l0)
+#Bound  98.25s best:4957100 next:[4957200,6526600] default_lp
+#50     99.24s best:4963100 next:[4963200,6526600] rnd_var_lns (d=0.74 s=139 t=0.10 p=0.53 stall=3 h=auto_l0)
+#51    100.66s best:4969100 next:[4969200,6526600] graph_arc_lns (d=0.07 s=142 t=0.10 p=0.33 stall=0 h=auto_l0)
+#52    104.00s best:5026100 next:[5026200,6526600] violation_ls(batch:17 #solutions_imported:16 #lin_moves:27'954 #lin_evals:413'313 #gen_moves:23'787 #gen_evals:0 #comp_moves:15 #backtracks:11'882 #weight_updates:5'004)
+#53    105.69s best:5029100 next:[5029200,6526600] graph_var_lns (d=0.38 s=150 t=0.10 p=0.50 stall=9 h=auto_l0)
+#54    105.85s best:5136500 next:[5136600,6526600] graph_arc_lns (d=0.09 s=151 t=0.10 p=0.38 stall=0 h=auto_l0)
+#55    106.53s best:5154500 next:[5154600,6526600] graph_cst_lns (d=0.56 s=152 t=0.10 p=0.50 stall=9 h=auto_l0)
+#Bound 109.31s best:5154500 next:[5154600,6511800] default_lp
+#56    112.61s best:5157500 next:[5157600,6511800] rnd_var_lns (d=0.74 s=157 t=0.10 p=0.53 stall=1 h=auto_l0)
+#57    118.10s best:5190700 next:[5190800,6511800] rins_pump_lns (d=0.25 s=164 t=0.10 p=0.38 stall=1 h=auto_l0)
+#58    122.53s best:5217900 next:[5218000,6511800] rnd_cst_lns (d=0.58 s=167 t=0.10 p=0.50 stall=3 h=auto_l0)
+#Bound 123.13s best:5217900 next:[5218000,6492300] default_lp
+#59    131.49s best:5220900 next:[5221000,6492300] graph_var_lns (d=0.30 s=177 t=0.10 p=0.47 stall=2 h=auto_l0)
+#60    131.79s best:5223900 next:[5224000,6492300] graph_arc_lns (d=0.07 s=178 t=0.10 p=0.37 stall=2 h=auto_l0)
+#61    133.46s best:5229900 next:[5230000,6492300] graph_dec_lns (d=0.70 s=180 t=0.10 p=0.53 stall=5 h=auto_l0)
+#Bound 137.15s best:5229900 next:[5230000,6481700] default_lp
+#62    146.53s best:5234900 next:[5235000,6481700] graph_arc_lns (d=0.11 s=196 t=0.10 p=0.43 stall=1 h=auto_l0)
+#63    152.94s best:5253100 next:[5253200,6481700] rnd_cst_lns (d=0.58 s=203 t=0.10 p=0.50 stall=3 h=auto_l0)
+#Bound 154.94s best:5253100 next:[5253200,6451000] default_lp
+#64    165.81s best:5255100 next:[5255200,6451000] violation_ls(batch:25 #solutions_imported:22 #lin_moves:73'378 #lin_evals:601'596 #gen_moves:32'610 #gen_evals:0 #comp_moves:15 #backtracks:16'293 #weight_updates:15'064)
+#Bound 168.60s best:5255100 next:[5255200,6434200] default_lp
+#65    177.13s best:5290500 next:[5290600,6434200] rins_pump_lns (d=0.15 s=236 t=0.10 p=0.36 stall=5 h=auto_l0)
+#Bound 191.33s best:5290500 next:[5290600,6410900] default_lp
+#66    194.44s best:5294500 next:[5294600,6410900] graph_arc_lns (d=0.09 s=259 t=0.10 p=0.43 stall=6 h=auto_l0)
+#67    194.92s best:5299100 next:[5299200,6410900] graph_cst_lns (d=0.57 s=260 t=0.10 p=0.50 stall=11 h=auto_l0)
+#68    201.50s best:5309700 next:[5309800,6410900] rnd_var_lns (d=0.74 s=265 t=0.10 p=0.52 stall=11 h=folio_rnd)
+#Bound 212.63s best:5309700 next:[5309800,6396700] default_lp
+#69    229.70s best:5312300 next:[5312400,6396700] graph_arc_lns (d=0.09 s=295 t=0.10 p=0.44 stall=3 h=auto_l0)
+#Bound 234.02s best:5312300 next:[5312400,6376200] default_lp
+#70    242.01s best:5315300 next:[5315400,6376200] rnd_cst_lns (d=0.59 s=311 t=0.10 p=0.50 stall=11 h=folio_rnd)
+#71    256.34s best:5336500 next:[5336600,6376200] rnd_cst_lns (d=0.59 s=329 t=0.10 p=0.50 stall=1 h=auto_l0)
+#Bound 259.59s best:5336500 next:[5336600,6367000] default_lp
+#72    271.58s best:5351700 next:[5351800,6367000] graph_cst_lns (d=0.57 s=350 t=0.10 p=0.50 stall=9 h=auto_l0)
+#73    272.14s best:5374500 next:[5374600,6367000] graph_dec_lns (d=0.74 s=351 t=0.10 p=0.53 stall=18 h=folio_rnd)
+#Bound 288.19s best:5374500 next:[5374600,6342700] default_lp
+
+Task timing                   n [     min,      max]      avg      dev     time         n [     min,      max]      avg      dev    dtime
+        'default_lp':         1 [   4.95m,    4.95m]    4.95m   0.00ns    4.95m         1 [  25.18s,   25.18s]   25.18s   0.00ns   25.18s
+  'feasibility_pump':        43 [  1.10ms,    3.10s]    1.22s 785.17ms   52.57s        41 [200.15ms,    1.89s] 747.61ms 462.80ms   30.65s
+     'graph_arc_lns':        42 [ 76.93ms, 674.89ms] 336.15ms 160.63ms   14.12s        42 [ 89.02us, 100.31ms]  71.38ms  36.27ms    3.00s
+     'graph_cst_lns':        42 [178.14ms,    1.22s] 595.70ms 304.70ms   25.02s        42 [219.14us, 138.70ms]  62.43ms  44.00ms    2.62s
+     'graph_dec_lns':        42 [204.93ms,    1.17s] 617.07ms 289.12ms   25.92s        42 [ 71.59us, 115.48ms]  58.21ms  44.33ms    2.44s
+     'graph_var_lns':        42 [ 94.47ms, 682.48ms] 373.61ms 177.66ms   15.69s        42 [109.00ns, 100.10ms]  62.39ms  43.20ms    2.62s
+         'rins/rens':        43 [  9.28ms, 939.39ms] 273.75ms 282.39ms   11.77s        28 [ 10.00ns, 100.42ms]  60.70ms  45.91ms    1.70s
+       'rnd_cst_lns':        43 [131.40ms, 981.17ms] 571.91ms 285.90ms   24.59s        42 [121.00ns, 104.06ms]  60.00ms  44.47ms    2.52s
+       'rnd_var_lns':        43 [116.95ms,    1.01s] 550.74ms 281.55ms   23.68s        43 [ 45.00ns, 104.66ms]  56.21ms  44.19ms    2.42s
+      'violation_ls':        43 [ 12.26ms,    4.09s]    2.40s    1.35s    1.72m        43 [  1.22ms, 846.22ms] 507.70ms 292.17ms   21.83s
+
+Search stats      Bools  Conflicts  Branches  Restarts  BoolPropag  IntegerPropag
+  'default_lp':  16'313          0   366'113   119'270  32'002'682     36'075'814
+
+SAT stats        ClassicMinim  LitRemoved  LitLearned  LitForgotten  Subsumed  MClauses  MDecisions  MLitTrue  MSubsumed  MLitRemoved  MReused
+  'default_lp':             0           0           0             0         0    27'740     201'307         0      1'570        7'850    6'903
+
+Lp stats         Component  Iterations  AddedCuts  OPTIMAL  DUAL_F.  DUAL_U.
+  'default_lp':          1      56'010     15'968      247       14        0
+
+Lp dimension                                                         Final dimension of first component
+  'default_lp':  7338 rows, 14738 columns, 36001 entries with magnitude in [2.785948e-01, 1.000000e+00]
+
+Lp debug         CutPropag  CutEqPropag  Adjust  Overflow      Bad  BadScaling
+  'default_lp':          0            0     260         0  197'807           0
+
+Lp pool          Constraints  Updates  Simplif  Merged  Shortened  Split  Strenghtened      Cuts/Call
+  'default_lp':       31'386        1        0       0          0      0           121  15'968/63'342
+
+Lp Cut           default_lp
+         CG_FF:       1'619
+          CG_K:         398
+         CG_KL:         192
+          CG_R:       2'900
+            IB:          69
+      MIR_3_FF:         254
+       MIR_3_R:           5
+      MIR_4_FF:          63
+      MIR_4_KL:           2
+      MIR_5_FF:           4
+      MIR_5_KL:           1
+      MIR_6_FF:           1
+  ZERO_HALF_FF:       5'363
+   ZERO_HALF_K:          31
+  ZERO_HALF_KL:          13
+   ZERO_HALF_R:       5'053
+
+LNS stats           Improv/Calls  Closed  Difficulty  TimeLimit
+  'graph_arc_lns':         12/42     48%        0.12       0.10
+  'graph_cst_lns':          7/42     50%        0.57       0.10
+  'graph_dec_lns':          9/42     52%        0.74       0.10
+  'graph_var_lns':          9/42     50%        0.36       0.10
+      'rins/rens':          5/28     46%        0.23       0.10
+    'rnd_cst_lns':         11/42     50%        0.59       0.10
+    'rnd_var_lns':         10/43     51%        0.75       0.10
+
+LS stats           Batches  Restarts  LinMoves  GenMoves  CompoundMoves  WeightUpdates
+  'violation_ls':       43         0   114'972    86'110             75         33'480
+
+Solutions (73)      Num     Rank
+  'graph_arc_lns':   12  [24,69]
+  'graph_cst_lns':    7   [6,72]
+  'graph_dec_lns':    9   [7,73]
+  'graph_var_lns':    9   [5,59]
+  'rens_pump_lns':    1    [1,1]
+  'rins_pump_lns':    4  [41,65]
+    'rnd_cst_lns':   11   [4,71]
+    'rnd_var_lns':   10   [3,68]
+   'violation_ls':   10   [2,64]
+
+Objective bounds     Num
+      'default_lp':   77
+  'initial_domain':    1
+
+Solution repositories    Added  Queried  Ignored  Synchro
+  'feasible solutions':    181      654        0      181
+        'lp solutions':      0        0        0        0
+                'pump':     69       43
+
+CpSolverResponse summary:
+status: FEASIBLE
+objective: 5374500
+best_bound: 6342700
+integers: 14991
+booleans: 16313
+conflicts: 0
+branches: 366113
+propagations: 32002682
+integer_propagations: 36075814
+restarts: 119270
+lp_iterations: 56010
+walltime: 300.025
+usertime: 300.025
+deterministic_time: 96.3046
+gap_integral: 1347.41
+solution_fingerprint: 0xda9c27723ef60631
+
+
+   🔄 Found solution #16, objective value: 2551300
+   🔄 Found solution #17, objective value: 2648300
+   🔄 Found solution #18, objective value: 2735300
+   🔄 Found solution #19, objective value: 2739300
+   🔄 Found solution #20, objective value: 2825300
+   🔄 Found solution #21, objective value: 2896900
+   🔄 Found solution #22, objective value: 3103500
+   🔄 Found solution #23, objective value: 3161300
+   🔄 Found solution #24, objective value: 3376300
+   🔄 Found solution #25, objective value: 3589300
+   🔄 Found solution #26, objective value: 3615300
+   🔄 Found solution #27, objective value: 3615400
+   🔄 Found solution #28, objective value: 3923200
+   🔄 Found solution #29, objective value: 3994200
+   🔄 Found solution #30, objective value: 4111100
+   🔄 Found solution #31, objective value: 4161100
+   🔄 Found solution #32, objective value: 4194300
+   🔄 Found solution #33, objective value: 4344300
+   🔄 Found solution #34, objective value: 4352300
+   🔄 Found solution #35, objective value: 4424700
+   🔄 Found solution #36, objective value: 4485700
+   🔄 Found solution #37, objective value: 4491700
+   🔄 Found solution #38, objective value: 4555700
+   🔄 Found solution #39, objective value: 4652700
+   🔄 Found solution #40, objective value: 4669700
+   🔄 Found solution #41, objective value: 4795700
+   🔄 Found solution #42, objective value: 4809700
+   🔄 Found solution #43, objective value: 4820700
+   🔄 Found solution #44, objective value: 4855700
+   🔄 Found solution #45, objective value: 4885700
+   🔄 Found solution #46, objective value: 4893700
+   🔄 Found solution #47, objective value: 4942500
+   🔄 Found solution #48, objective value: 4952500
+   🔄 Found solution #49, objective value: 4957100
+   🔄 Found solution #50, objective value: 4963100
+   🔄 Found solution #51, objective value: 4969100
+   🔄 Found solution #52, objective value: 5026100
+   🔄 Found solution #53, objective value: 5029100
+   🔄 Found solution #54, objective value: 5136500
+   🔄 Found solution #55, objective value: 5154500
+   🔄 Found solution #56, objective value: 5157500
+   🔄 Found solution #57, objective value: 5190700
+   🔄 Found solution #58, objective value: 5217900
+   🔄 Found solution #59, objective value: 5220900
+   🔄 Found solution #60, objective value: 5223900
+   🔄 Found solution #61, objective value: 5229900
+   🔄 Found solution #62, objective value: 5234900
+   🔄 Found solution #63, objective value: 5253100
+   🔄 Found solution #64, objective value: 5255100
+   🔄 Found solution #65, objective value: 5290500
+   🔄 Found solution #66, objective value: 5294500
+   🔄 Found solution #67, objective value: 5299100
+   🔄 Found solution #68, objective value: 5309700
+   🔄 Found solution #69, objective value: 5312300
+   🔄 Found solution #70, objective value: 5315300
+   🔄 Found solution #71, objective value: 5336500
+   🔄 Found solution #72, objective value: 5351700
+   🔄 Found solution #73, objective value: 5374500
+   ✓ Solver finished: FEASIBLE
+
+==================================================
+UNIT NIGHT COVERAGE ANALYSIS
+==================================================
+
+Unit night days covered: 181/181
+✅ ALL UNIT NIGHT DAYS FULLY COVERED
+
+Final Unit Night assignments:
+  Mei Yi Goh: 23 N_REG shifts (WTE-adjusted: 28.8)
+  Ryan White: 15 N_REG shifts (WTE-adjusted: 18.8)
+  Nikki Francis: 21 N_REG shifts (WTE-adjusted: 26.2)
+  Reuben Firth: 11 N_REG shifts (WTE-adjusted: 13.8)
+  Alexander Yule: 20 N_REG shifts (WTE-adjusted: 33.3)
+  Abdifatah Mohamud: 16 N_REG shifts (WTE-adjusted: 16.0)
+  Hanin El Abbas: 24 N_REG shifts (WTE-adjusted: 30.0)
+  Sarah Hallett: 19 N_REG shifts (WTE-adjusted: 31.7)
+  Manan Kamboj: 4 N_REG shifts (WTE-adjusted: 4.0)
+  Mahmoud: 8 N_REG shifts (WTE-adjusted: 8.0)
+  Sarah Walker: 20 N_REG shifts (WTE-adjusted: 33.3)
+
+Total unit nights assigned: 181
+INFO:     127.0.0.1:53454 - "POST /solve_sequential HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53454 - "POST /check_constraints HTTP/1.1" 200 OK
+================================================================================
+WEEKEND LONG DAYS STAGE
+================================================================================
+
+📦 Phase 1: COMET Weekend Long Days
+  Found 13 COMET weekends to cover
+  COMET Weekend Availability:
+    Mei Yi Goh: can work 10/13 COMET weekends
+    Ryan White: can work 8/13 COMET weekends
+    Nikki Francis: can work 6/13 COMET weekends
+    Reuben Firth: can work 9/13 COMET weekends
+    Abdifatah Mohamud: can work 8/13 COMET weekends
+    Hanin El Abbas: can work 9/13 COMET weekends
+    Manan Kamboj: can work 8/13 COMET weekends
+    Mahmoud: can work 9/13 COMET weekends
+  ✅ Mei Yi Goh: COMET weekend 2026-03-28 - 2026-03-29
+  ✅ Mei Yi Goh: COMET weekend 2026-06-06 - 2026-06-07
+  ✅ Ryan White: COMET weekend 2026-04-11 - 2026-04-12
+  ✅ Ryan White: COMET weekend 2026-04-25 - 2026-04-26
+  ✅ Nikki Francis: COMET weekend 2026-02-14 - 2026-02-15
+  ✅ Nikki Francis: COMET weekend 2026-06-20 - 2026-06-21
+  ✅ Reuben Firth: COMET weekend 2026-02-28 - 2026-03-01
+  ✅ Reuben Firth: COMET weekend 2026-05-09 - 2026-05-10
+  ✅ Abdifatah Mohamud: COMET weekend 2026-05-23 - 2026-05-24
+  ✅ Hanin El Abbas: COMET weekend 2026-07-18 - 2026-07-19
+  ✅ Manan Kamboj: COMET weekend 2026-07-04 - 2026-07-05
+  ✅ Manan Kamboj: COMET weekend 2026-08-01 - 2026-08-02
+  ✅ Mahmoud: COMET weekend 2026-03-14 - 2026-03-15
+
+📦 Phase 2: Unit Weekend Long Days
+  Found 26 total weekends to cover
+  Unit Weekend Availability:
+    Mei Yi Goh: can work 15/26 Unit weekends
+    Ryan White: can work 18/26 Unit weekends
+    Nikki Francis: can work 16/26 Unit weekends
+    Reuben Firth: can work 18/26 Unit weekends
+    Alexander Yule: can work 22/26 Unit weekends
+    Abdifatah Mohamud: can work 19/26 Unit weekends
+    Hanin El Abbas: can work 17/26 Unit weekends
+    Sarah Hallett: can work 22/26 Unit weekends
+    Manan Kamboj: can work 19/26 Unit weekends
+    Mahmoud: can work 20/26 Unit weekends
+    Sarah Walker: can work 21/26 Unit weekends
+  Mei Yi Goh: minimum 1 weekends (fair share: 2.4, available: 15)
+  Ryan White: minimum 1 weekends (fair share: 2.4, available: 18)
+  Nikki Francis: minimum 1 weekends (fair share: 2.4, available: 16)
+  Reuben Firth: minimum 1 weekends (fair share: 2.4, available: 18)
+  Alexander Yule: minimum 1 weekends (fair share: 1.8, available: 22)
+  Abdifatah Mohamud: minimum 2 weekends (fair share: 3.0, available: 19)
+  Hanin El Abbas: minimum 1 weekends (fair share: 2.4, available: 17)
+  Sarah Hallett: minimum 1 weekends (fair share: 1.8, available: 22)
+  Manan Kamboj: minimum 2 weekends (fair share: 3.0, available: 19)
+  Mahmoud: minimum 2 weekends (fair share: 3.0, available: 20)
+  Sarah Walker: minimum 1 weekends (fair share: 1.8, available: 21)
+  ✅ Mei Yi Goh: Unit weekend 2026-05-23 - 2026-05-24 + Mon short day
+  ✅ Mei Yi Goh: Unit weekend 2026-06-13 - 2026-06-14 + Fri short day
+  ✅ Mei Yi Goh: Unit weekend 2026-07-18 - 2026-07-19 + Fri short day
+  ✅ Ryan White: Unit weekend 2026-03-21 - 2026-03-22 + Fri short day
+  ✅ Ryan White: Unit weekend 2026-07-11 - 2026-07-12 + Mon short day
+  ✅ Ryan White: Unit weekend 2026-07-25 - 2026-07-26 + Fri short day
+  ✅ Nikki Francis: Unit weekend 2026-05-02 - 2026-05-03 + Fri short day
+  ✅ Nikki Francis: Unit weekend 2026-05-30 - 2026-05-31 + Fri short day
+  ✅ Nikki Francis: Unit weekend 2026-06-27 - 2026-06-28 + Fri short day
+  ✅ Reuben Firth: Unit weekend 2026-03-07 - 2026-03-08 + Fri short day
+  ✅ Reuben Firth: Unit weekend 2026-04-11 - 2026-04-12 + Fri short day
+  ✅ Reuben Firth: Unit weekend 2026-06-20 - 2026-06-21 + Fri short day
+  ✅ Alexander Yule: Unit weekend 2026-06-06 - 2026-06-07 + Mon short day
+  ✅ Alexander Yule: Unit weekend 2026-07-04 - 2026-07-05 + Fri short day
+  ✅ Abdifatah Mohamud: Unit weekend 2026-03-14 - 2026-03-15 + Fri short day
+  ✅ Abdifatah Mohamud: Unit weekend 2026-04-04 - 2026-04-05 + Fri short day
+  ✅ Hanin El Abbas: Unit weekend 2026-05-16 - 2026-05-17 + Fri short day
+  ✅ Sarah Hallett: Unit weekend 2026-02-07 - 2026-02-08 + Fri short day
+  ✅ Sarah Hallett: Unit weekend 2026-02-14 - 2026-02-15 + Mon short day
+  ✅ Manan Kamboj: Unit weekend 2026-02-28 - 2026-03-01 + Fri short day
+  ✅ Manan Kamboj: Unit weekend 2026-04-18 - 2026-04-19 + Mon short day
+  ✅ Manan Kamboj: Unit weekend 2026-04-25 - 2026-04-26 + Mon short day
+  ✅ Mahmoud: Unit weekend 2026-02-21 - 2026-02-22 + Fri short day
+  ✅ Mahmoud: Unit weekend 2026-03-28 - 2026-03-29 + Mon short day
+  ✅ Sarah Walker: Unit weekend 2026-05-09 - 2026-05-10 + Mon short day
+  ✅ Sarah Walker: Unit weekend 2026-08-01 - 2026-08-02 + Fri short day
+
+📊 Weekend Block Distribution:
+  dr1: 5 weekend blocks (WTE: 0.8)
+  dr2: 5 weekend blocks (WTE: 0.8)
+  dr3: 5 weekend blocks (WTE: 0.8)
+  dr4: 5 weekend blocks (WTE: 0.8)
+  dr5: 2 weekend blocks (WTE: 0.6)
+  dr6: 3 weekend blocks (WTE: 1.0)
+  dr7: 2 weekend blocks (WTE: 0.8)
+  dr8: 2 weekend blocks (WTE: 0.6)
+  dr9: 5 weekend blocks (WTE: 1.0)
+  dr10: 3 weekend blocks (WTE: 1.0)
+  dr11: 2 weekend blocks (WTE: 0.6)
+INFO:     127.0.0.1:40014 - "POST /solve_sequential HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40014 - "POST /check_constraints HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [8501]
+INFO:     Started server process [12835]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'test_fairness_fix.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [12835]
+INFO:     Started server process [13069]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'test_fairness_fix.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [13069]
+INFO:     Started server process [14181]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'rostering/sequential_solver.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [14181]
+WARNING:  StatReload detected changes in 'scripts/solve_sample.py'. Reloading...
